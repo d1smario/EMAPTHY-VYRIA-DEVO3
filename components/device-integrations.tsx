@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Link2, Check, X, RefreshCw, Upload, AlertCircle, Clock } from "lucide-react"
-import { getClient } from "@/lib/supabase/client"
+import { createClient } from "@/lib/supabase/client"
 
 interface DeviceIntegrationsProps {
   athleteId: string | undefined
@@ -123,7 +123,7 @@ export function DeviceIntegrations({ athleteId }: DeviceIntegrationsProps) {
   }, [athleteId])
 
   const loadConnections = async () => {
-    const supabase = getClient()
+    const supabase = createClient()
 
     try {
       const { data } = await supabase.from("device_connections").select("*").eq("user_id", athleteId)
@@ -170,7 +170,7 @@ export function DeviceIntegrations({ athleteId }: DeviceIntegrationsProps) {
     if (!apiKey.trim()) return
 
     setLoading(providerId)
-    const supabase = getClient()
+    const supabase = createClient()
 
     try {
       const { error } = await supabase.from("device_connections").upsert(
@@ -203,7 +203,7 @@ export function DeviceIntegrations({ athleteId }: DeviceIntegrationsProps) {
 
   const handleDisconnect = async (providerId: string) => {
     setLoading(providerId)
-    const supabase = getClient()
+    const supabase = createClient()
 
     try {
       const { error } = await supabase
