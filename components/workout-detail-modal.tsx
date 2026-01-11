@@ -7,8 +7,8 @@ import { Clock, Target, Flame, Zap, TrendingUp, Bike, Dumbbell, CalendarDays, Ch
 
 interface WorkoutBlock {
   type: "warmup" | "interval" | "steady" | "recovery" | "cooldown"
-  duration: number
-  intensity: number
+  duration: number // seconds
+  intensity: number // % FTP
   zone?: string
   repeats?: number
   recoveryDuration?: number
@@ -53,38 +53,60 @@ const getZoneFromIntensity = (intensity: number): string => {
 
 const getZoneColor = (zone: string): string => {
   switch (zone?.toUpperCase()) {
-    case "Z1": return "bg-slate-500"
-    case "Z2": return "bg-green-500"
-    case "Z3": return "bg-yellow-500"
-    case "Z4": return "bg-orange-500"
-    case "Z5": return "bg-red-500"
-    case "Z6": return "bg-red-600"
-    case "Z7": return "bg-red-800"
-    default: return "bg-fuchsia-500"
+    case "Z1":
+      return "bg-slate-500"
+    case "Z2":
+      return "bg-green-500"
+    case "Z3":
+      return "bg-yellow-500"
+    case "Z4":
+      return "bg-orange-500"
+    case "Z5":
+      return "bg-red-500"
+    case "Z6":
+      return "bg-red-600"
+    case "Z7":
+      return "bg-red-800"
+    default:
+      return "bg-fuchsia-500"
   }
 }
 
 const getZoneName = (zone: string): string => {
   switch (zone?.toUpperCase()) {
-    case "Z1": return "Recovery"
-    case "Z2": return "Endurance"
-    case "Z3": return "Tempo"
-    case "Z4": return "Threshold"
-    case "Z5": return "VO2max"
-    case "Z6": return "Anaerobic"
-    case "Z7": return "Neuromuscular"
-    default: return zone
+    case "Z1":
+      return "Recovery"
+    case "Z2":
+      return "Endurance"
+    case "Z3":
+      return "Tempo"
+    case "Z4":
+      return "Threshold"
+    case "Z5":
+      return "VO2max"
+    case "Z6":
+      return "Anaerobic"
+    case "Z7":
+      return "Neuromuscular"
+    default:
+      return zone
   }
 }
 
 const getBlockTypeName = (type: string): string => {
   switch (type) {
-    case "warmup": return "Riscaldamento"
-    case "interval": return "Intervallo"
-    case "steady": return "Steady State"
-    case "recovery": return "Recupero"
-    case "cooldown": return "Defaticamento"
-    default: return type
+    case "warmup":
+      return "Riscaldamento"
+    case "interval":
+      return "Intervallo"
+    case "steady":
+      return "Steady State"
+    case "recovery":
+      return "Recupero"
+    case "cooldown":
+      return "Defaticamento"
+    default:
+      return type
   }
 }
 
@@ -133,7 +155,9 @@ export function WorkoutDetailModal({ workout, isOpen, onClose, dayName, athleteF
       <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto bg-card">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-3">
-            <div className={`h-10 w-10 rounded-full flex items-center justify-center ${getZoneColor(workout.target_zone || "Z2")} text-white`}>
+            <div
+              className={`h-10 w-10 rounded-full flex items-center justify-center ${getZoneColor(workout.target_zone || "Z2")} text-white`}
+            >
               {getWorkoutIcon(workout.workout_type)}
             </div>
             <div>
@@ -231,7 +255,9 @@ export function WorkoutDetailModal({ workout, isOpen, onClose, dayName, athleteF
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
                           <span className="font-medium">{getBlockTypeName(block.type)}</span>
-                          <Badge variant="outline" className="text-xs">{zone}</Badge>
+                          <Badge variant="outline" className="text-xs">
+                            {zone}
+                          </Badge>
                         </div>
                         <span className="text-sm text-muted-foreground">{formatDuration(block.duration)}</span>
                       </div>
@@ -289,7 +315,9 @@ export function WorkoutDetailModal({ workout, isOpen, onClose, dayName, athleteF
           )}
 
           <div className="flex justify-end gap-2 pt-4 border-t border-border">
-            <Button variant="outline" onClick={onClose}>Chiudi</Button>
+            <Button variant="outline" onClick={onClose}>
+              Chiudi
+            </Button>
             {!workout.completed && (
               <Button className="bg-fuchsia-600 hover:bg-fuchsia-700">
                 <Play className="mr-2 h-4 w-4" />
@@ -308,7 +336,13 @@ function generateDefaultBlocks(workout: WorkoutData): WorkoutBlock[] {
   const zone = workout.target_zone || "Z2"
 
   const zoneIntensities: Record<string, number> = {
-    Z1: 50, Z2: 65, Z3: 80, Z4: 95, Z5: 108, Z6: 130, Z7: 150,
+    Z1: 50,
+    Z2: 65,
+    Z3: 80,
+    Z4: 95,
+    Z5: 108,
+    Z6: 130,
+    Z7: 150,
   }
 
   const baseIntensity = zoneIntensities[zone.toUpperCase()] || 70
@@ -329,7 +363,15 @@ function generateDefaultBlocks(workout: WorkoutData): WorkoutBlock[] {
 
     return [
       { type: "warmup", duration: warmupTime, intensity: 55, zone: "Z2" },
-      { type: "interval", duration: intervalDuration, intensity: baseIntensity, zone, repeats, recoveryDuration, recoveryIntensity: 50 },
+      {
+        type: "interval",
+        duration: intervalDuration,
+        intensity: baseIntensity,
+        zone,
+        repeats,
+        recoveryDuration,
+        recoveryIntensity: 50,
+      },
       { type: "cooldown", duration: cooldownTime, intensity: 45, zone: "Z1" },
     ]
   } else {
