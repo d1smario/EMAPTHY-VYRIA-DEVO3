@@ -124,6 +124,7 @@ export const IntegrationsPanel = () => {
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
+      {/* Header Section */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h2 className="text-2xl font-bold tracking-tight">Integrations</h2>
@@ -137,6 +138,7 @@ export const IntegrationsPanel = () => {
         </div>
       </div>
 
+      {/* Main Integrations Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {services.map((service) => (
           <Card key={service.id} className="flex flex-col">
@@ -272,6 +274,7 @@ export const IntegrationsPanel = () => {
           </Card>
         ))}
 
+        {/* Manual Upload Card */}
         <Card className="flex flex-col border-dashed">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -291,6 +294,7 @@ export const IntegrationsPanel = () => {
         </Card>
       </div>
 
+      {/* Data Source Status */}
       <Card>
         <CardHeader>
           <CardTitle>Data Streams</CardTitle>
