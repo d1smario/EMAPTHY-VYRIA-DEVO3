@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
-import { getClient } from "@/lib/supabase/client"
+import { createClient } from "@/lib/supabase/client"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
 import {
@@ -17,6 +17,7 @@ import {
   Wand2,
   Dna,
   BarChart3,
+  Smartphone,
 } from "lucide-react"
 import { AthleteProfile } from "@/components/athlete-profile"
 import { WeeklyTraining } from "@/components/weekly-training"
@@ -31,6 +32,7 @@ import VyriaTrainingPlan from "@/components/vyria-training-plan"
 import DailyTrainingReport from "@/components/daily-training-report"
 import { MicrobiomeEpigenetic } from "@/components/microbiome-epigenetic"
 import { ActivityDashboard } from "@/components/activity-dashboard"
+import { IntegrationsPanel } from "@/components/integrations-panel"
 import type { User as SupabaseUser } from "@supabase/supabase-js"
 
 export interface AthleteDataType {
@@ -123,7 +125,7 @@ export function DashboardContent({
 }: DashboardContentProps) {
   const [activeTab, setActiveTab] = useState("profile")
   const router = useRouter()
-  const supabase = getClient()
+  const supabase = createClient()
 
   const handleLogout = async () => {
     if (supabase) {
@@ -180,7 +182,7 @@ export function DashboardContent({
 
               <Tabs defaultValue="profile" className="space-y-6" onValueChange={setActiveTab}>
                 <div className="flex items-center justify-between overflow-x-auto pb-2 print:hidden">
-                  <TabsList className="grid w-full grid-cols-9 lg:w-[1100px]">
+                  <TabsList className="grid w-full grid-cols-10 lg:w-[1200px]">
                     <TabsTrigger value="profile" className="flex items-center gap-2">
                       <User className="h-4 w-4" />
                       <span className="hidden sm:inline">Profilo</span>
@@ -212,6 +214,10 @@ export function DashboardContent({
                     <TabsTrigger value="reports" className="flex items-center gap-2">
                       <FileText className="h-4 w-4" />
                       <span className="hidden sm:inline">Daily Log</span>
+                    </TabsTrigger>
+                    <TabsTrigger value="devices" className="flex items-center gap-2">
+                      <Smartphone className="h-4 w-4" />
+                      <span className="hidden sm:inline">Devices</span>
                     </TabsTrigger>
                     <TabsTrigger value="delivery" className="flex items-center gap-2">
                       <Printer className="h-4 w-4" />
@@ -265,6 +271,10 @@ export function DashboardContent({
                   ) : (
                     <BioMapReport athleteData={athleteData} userName={profile?.full_name} />
                   )}
+                </TabsContent>
+
+                <TabsContent value="devices" className="space-y-4 focus-visible:outline-none focus-visible:ring-0">
+                  <IntegrationsPanel />
                 </TabsContent>
 
                 <TabsContent value="delivery" className="space-y-4 focus-visible:outline-none focus-visible:ring-0">
