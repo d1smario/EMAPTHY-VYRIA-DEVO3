@@ -1,9 +1,12 @@
 "use client"
 
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { CalendarDays, Zap, Bike, Dumbbell, Clock, Target, CheckCircle2, Circle } from "lucide-react"
+import { WorkoutDetailModal } from "@/components/workout-detail-modal"
+import { createClient } from "@/lib/supabase/client"
 import type { AthleteDataType, WorkoutType } from "@/components/dashboard-content"
 
 interface WeeklyTrainingProps {
@@ -69,11 +72,53 @@ const getCurrentWeekRange = () => {
 }
 
 export const WeeklyTraining = ({ athleteData, userName, workouts }: WeeklyTrainingProps) => {
+  const [selectedWorkout, setSelectedWorkout] = useState<WorkoutType | null>(null)
+  const [selectedDayName, setSelectedDayName] = useState<string>("")
+  const [athleteFTP, setAthleteFTP] = useState<number>(300)
+
   const hasTrainingPlan = workouts && workouts.length > 0
   const weekRange = getCurrentWeekRange()
 
   const today = new Date()
   const todayIndex = today.getDay() === 0 ? 6 : today.getDay() - 1
+
+  useEffect(() => {
+    const loadAthleteFTP = async () => {
+      if (!athleteData?.id) return
+
+      const supabase = createClient()
+
+      const profiles = athleteData.metabolic_profiles
+      if (profiles && profiles.length > 0) {
+        const profileWithFTP = profiles.find((p) => p.ftp_watts && p.ftp_watts > 0)
+        if (profileWithFTP?.ftp_watts) {
+          setAthleteFTP(profileWithFTP.ftp_watts)
+          return
+        }
+      }
+
+      const { data: dbProfiles } = await supabase
+        .from("metabolic_profiles")
+        .select("ftp_watts")
+        .eq("athlete_id", athleteData.id)
+        .not("ftp_watts", "is", null)
+        .order("updated_at", { ascending: false })
+        .limit(1)
+
+      if (dbProfiles && dbProfiles.length > 0 && dbProfiles[0].ftp_watts) {
+        setAthleteFTP(dbProfiles[0].ftp_watts)
+      }
+    }
+
+    loadAthleteFTP()
+  }, [athleteData?.id, athleteData?.metabolic_profiles])
+
+  const handleDayClick = (workout: WorkoutType | undefined, dayIndex: number) => {
+    if (workout) {
+      setSelectedWorkout(workout)
+      setSelectedDayName(dayNames[dayIndex])
+    }
+  }
 
   if (!hasTrainingPlan) {
     return (
@@ -85,7 +130,6 @@ export const WeeklyTraining = ({ athleteData, userName, workouts }: WeeklyTraini
             Il piano di allenamento viene generato automaticamente da VYRIA in base al tuo programma annuale. Vai alla
             tab <strong>VYRIA</strong> per creare il piano e generare la settimana.
           </p>
-
           <div className="flex gap-4 mb-8">
             <Button className="bg-fuchsia-600 hover:bg-fuchsia-700">
               <Zap className="mr-2 h-4 w-4" />
@@ -97,7 +141,6 @@ export const WeeklyTraining = ({ athleteData, userName, workouts }: WeeklyTraini
     )
   }
 
-  // Calculate weekly stats
   const totalMinutes = workouts.reduce((sum, w) => sum + (w.duration_minutes || 0), 0)
   const totalTSS = workouts.reduce((sum, w) => sum + ((w as any).tss || 0), 0)
   const cyclingWorkouts = workouts.filter((w) => w.workout_type === "cycling" || w.workout_type === "bike")
@@ -136,7 +179,6 @@ export const WeeklyTraining = ({ athleteData, userName, workouts }: WeeklyTraini
         </div>
       </div>
 
-      {/* Weekly summary cards */}
       <div className="grid gap-4 md:grid-cols-4 mb-6">
         <Card>
           <CardContent className="pt-6">
@@ -199,7 +241,6 @@ export const WeeklyTraining = ({ athleteData, userName, workouts }: WeeklyTraini
         </Card>
       </div>
 
-      {/* Weekly calendar grid */}
       <div className="grid gap-4 md:grid-cols-7">
         {dayNames.map((dayName, dayIndex) => {
           const dayWorkout = workouts.find((w) => w.day_of_week === dayIndex)
@@ -211,10 +252,12 @@ export const WeeklyTraining = ({ athleteData, userName, workouts }: WeeklyTraini
             <Card
               key={dayIndex}
               className={`
+                cursor-pointer transition-all hover:scale-[1.02] hover:shadow-lg
                 ${dayWorkout ? "border-fuchsia-500/50" : "opacity-60"} 
                 ${isToday ? "ring-2 ring-fuchsia-500 ring-offset-2 ring-offset-background" : ""}
                 ${isCompleted ? "bg-green-500/5" : ""}
               `}
+              onClick={() => handleDayClick(dayWorkout, dayIndex)}
             >
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium flex items-center justify-between">
@@ -244,15 +287,6 @@ export const WeeklyTraining = ({ athleteData, userName, workouts }: WeeklyTraini
                       <span className="font-semibold text-sm">{dayWorkout.title}</span>
                     </div>
                     <p className="text-xs text-muted-foreground line-clamp-2">{dayWorkout.description}</p>
-                    {(dayWorkout as any).gym_settings && (
-                      <div className="flex flex-wrap gap-1">
-                        {(dayWorkout as any).gym_settings.muscle_groups?.map((muscle: string, idx: number) => (
-                          <Badge key={idx} variant="secondary" className="text-xs bg-purple-500/20 text-purple-300">
-                            {muscle}
-                          </Badge>
-                        ))}
-                      </div>
-                    )}
                     <div className="flex items-center justify-between text-xs text-muted-foreground">
                       {dayWorkout.duration_minutes && (
                         <div className="flex items-center gap-1">
@@ -278,86 +312,13 @@ export const WeeklyTraining = ({ athleteData, userName, workouts }: WeeklyTraini
         })}
       </div>
 
-      {/* Detailed workout list */}
-      <Card className="mt-6">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Target className="h-5 w-5 text-fuchsia-500" />
-            Dettaglio Allenamenti
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            {workouts.map((workout) => {
-              const isCompleted = (workout as any).completed
-              const dayIndex = workout.day_of_week
-              const isPast = dayIndex < todayIndex
-              const isToday = dayIndex === todayIndex
-
-              return (
-                <div
-                  key={workout.id}
-                  className={`
-                    flex items-start gap-4 p-4 rounded-lg 
-                    ${isCompleted ? "bg-green-500/10 border border-green-500/30" : "bg-muted/50"}
-                    ${isToday ? "ring-2 ring-fuchsia-500/50" : ""}
-                  `}
-                >
-                  <div
-                    className={`h-10 w-10 rounded-full flex items-center justify-center ${getZoneColor(workout.target_zone)}`}
-                  >
-                    {getWorkoutIcon(workout.workout_type)}
-                  </div>
-                  <div className="flex-1">
-                    <div className="flex items-center justify-between">
-                      <h4 className="font-semibold flex items-center gap-2">
-                        {dayNames[workout.day_of_week]} - {workout.title}
-                        {isToday && <Badge className="bg-fuchsia-500 text-xs">Oggi</Badge>}
-                        {isCompleted && <CheckCircle2 className="h-4 w-4 text-green-500" />}
-                      </h4>
-                      <div className="flex items-center gap-2">
-                        {(workout as any).tss && (
-                          <Badge variant="outline" className="border-purple-500 text-purple-400">
-                            {(workout as any).tss} TSS
-                          </Badge>
-                        )}
-                        <Badge variant="outline">
-                          {workout.duration_minutes && workout.duration_minutes >= 60
-                            ? `${Math.floor(workout.duration_minutes / 60)}h ${workout.duration_minutes % 60}m`
-                            : `${workout.duration_minutes}m`}
-                        </Badge>
-                      </div>
-                    </div>
-                    <p className="text-sm text-muted-foreground mt-1">{workout.description}</p>
-                    {workout.intervals && workout.intervals.blocks && (
-                      <div className="mt-2 flex flex-wrap gap-2">
-                        {workout.intervals.blocks.map((block: any, idx: number) => (
-                          <Badge key={idx} variant="secondary" className="text-xs">
-                            {block.type === "interval"
-                              ? `${block.repeats}x ${Math.floor(block.duration / 60)}'${block.duration % 60}" @ ${block.intensity}%`
-                              : block.type === "warmup" || block.type === "cooldown"
-                                ? `${block.type === "warmup" ? "WU" : "CD"} ${Math.floor(block.duration / 60)}'`
-                                : `${Math.floor(block.duration / 60)}' @ ${block.intensity}%`}
-                          </Badge>
-                        ))}
-                      </div>
-                    )}
-                    {(workout as any).gym_settings && (
-                      <div className="mt-2 flex flex-wrap gap-1">
-                        {(workout as any).gym_settings.muscle_groups?.map((muscle: string, idx: number) => (
-                          <Badge key={idx} variant="secondary" className="text-xs bg-purple-500/20 text-purple-300">
-                            {muscle}
-                          </Badge>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        </CardContent>
-      </Card>
+      <WorkoutDetailModal
+        workout={selectedWorkout as any}
+        isOpen={!!selectedWorkout}
+        onClose={() => setSelectedWorkout(null)}
+        dayName={selectedDayName}
+        athleteFTP={athleteFTP}
+      />
     </div>
   )
 }
