@@ -138,8 +138,10 @@ const getWorkoutIcon = (type: string) => {
 export function WorkoutDetailModal({ workout, isOpen, onClose, dayName, athleteFTP = 300 }: WorkoutDetailModalProps) {
   if (!workout) return null
 
+  // Generate default blocks if none exist
   const blocks: WorkoutBlock[] = workout.intervals?.blocks || generateDefaultBlocks(workout)
 
+  // Calculate total duration from blocks
   const totalBlockDuration = blocks.reduce((sum, block) => {
     let blockTime = block.duration
     if (block.type === "interval" && block.repeats) {
@@ -148,6 +150,7 @@ export function WorkoutDetailModal({ workout, isOpen, onClose, dayName, athleteF
     return sum + blockTime
   }, 0)
 
+  // Calculate power targets
   const calculatePower = (intensity: number) => Math.round((intensity / 100) * athleteFTP)
 
   return (
@@ -174,6 +177,7 @@ export function WorkoutDetailModal({ workout, isOpen, onClose, dayName, athleteF
         </DialogHeader>
 
         <div className="space-y-6 mt-4">
+          {/* Summary Stats */}
           <div className="grid grid-cols-4 gap-3">
             <Card className="bg-muted/50">
               <CardContent className="p-3 text-center">
@@ -209,18 +213,21 @@ export function WorkoutDetailModal({ workout, isOpen, onClose, dayName, athleteF
             </Card>
           </div>
 
+          {/* Description */}
           {workout.description && (
             <div className="p-4 bg-muted/30 rounded-lg">
               <p className="text-sm text-muted-foreground">{workout.description}</p>
             </div>
           )}
 
+          {/* Visual Block Chart */}
           <div className="space-y-3">
             <h3 className="font-semibold flex items-center gap-2">
               <Play className="h-4 w-4 text-fuchsia-500" />
               Struttura Allenamento
             </h3>
 
+            {/* Visual Timeline Bar */}
             <div className="relative h-16 bg-muted rounded-lg overflow-hidden flex">
               {blocks.map((block, idx) => {
                 let blockDuration = block.duration
@@ -243,10 +250,12 @@ export function WorkoutDetailModal({ workout, isOpen, onClose, dayName, athleteF
               })}
             </div>
 
+            {/* Detailed Blocks List */}
             <div className="space-y-2">
               {blocks.map((block, idx) => {
                 const zone = block.zone || getZoneFromIntensity(block.intensity)
                 const power = calculatePower(block.intensity)
+                const blockDuration = block.duration
 
                 return (
                   <div key={idx} className="flex items-center gap-3 p-3 bg-muted/30 rounded-lg">
@@ -279,6 +288,7 @@ export function WorkoutDetailModal({ workout, isOpen, onClose, dayName, athleteF
             </div>
           </div>
 
+          {/* Metabolic Goals */}
           {(workout.metabolic_goal || workout.cho_target || workout.fat_target) && (
             <div className="space-y-3">
               <h3 className="font-semibold flex items-center gap-2">
@@ -314,6 +324,7 @@ export function WorkoutDetailModal({ workout, isOpen, onClose, dayName, athleteF
             </div>
           )}
 
+          {/* Action Button */}
           <div className="flex justify-end gap-2 pt-4 border-t border-border">
             <Button variant="outline" onClick={onClose}>
               Chiudi
@@ -331,10 +342,12 @@ export function WorkoutDetailModal({ workout, isOpen, onClose, dayName, athleteF
   )
 }
 
+// Generate default blocks based on workout type and zone
 function generateDefaultBlocks(workout: WorkoutData): WorkoutBlock[] {
-  const duration = (workout.duration_minutes || 60) * 60
+  const duration = (workout.duration_minutes || 60) * 60 // convert to seconds
   const zone = workout.target_zone || "Z2"
 
+  // Base intensities per zone
   const zoneIntensities: Record<string, number> = {
     Z1: 50,
     Z2: 65,
@@ -347,18 +360,21 @@ function generateDefaultBlocks(workout: WorkoutData): WorkoutBlock[] {
 
   const baseIntensity = zoneIntensities[zone.toUpperCase()] || 70
 
+  // Generate blocks based on zone/type
   if (zone.toUpperCase() === "Z1" || zone.toUpperCase() === "Z2") {
+    // Endurance workout - simple structure
     return [
       { type: "warmup", duration: 600, intensity: 50, zone: "Z1" },
       { type: "steady", duration: duration - 900, intensity: baseIntensity, zone },
       { type: "cooldown", duration: 300, intensity: 45, zone: "Z1" },
     ]
   } else if (zone.toUpperCase() === "Z4" || zone.toUpperCase() === "Z5") {
+    // Interval workout
     const warmupTime = 900
     const cooldownTime = 600
     const mainTime = duration - warmupTime - cooldownTime
-    const intervalDuration = zone.toUpperCase() === "Z4" ? 480 : 180
-    const recoveryDuration = zone.toUpperCase() === "Z4" ? 240 : 180
+    const intervalDuration = zone.toUpperCase() === "Z4" ? 480 : 180 // 8' for Z4, 3' for Z5
+    const recoveryDuration = zone.toUpperCase() === "Z4" ? 240 : 180 // 4' for Z4, 3' for Z5
     const repeats = Math.floor(mainTime / (intervalDuration + recoveryDuration))
 
     return [
@@ -375,6 +391,7 @@ function generateDefaultBlocks(workout: WorkoutData): WorkoutBlock[] {
       { type: "cooldown", duration: cooldownTime, intensity: 45, zone: "Z1" },
     ]
   } else {
+    // Tempo/threshold workout
     return [
       { type: "warmup", duration: 900, intensity: 55, zone: "Z2" },
       { type: "steady", duration: (duration - 1500) / 2, intensity: baseIntensity - 5, zone: "Z3" },
