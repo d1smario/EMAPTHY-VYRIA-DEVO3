@@ -12,30 +12,33 @@ import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import {
-  Activity,
-  Zap,
-  Bike,
-  Dumbbell,
-  Heart,
-  Loader2,
-  CheckCircle2,
-  AlertCircle,
-  Save,
-  Calendar,
-  Clock,
-  Gauge,
-  Plus,
-  Trash2,
-  GripVertical,
-  Target,
-  Flame,
-  Mountain,
-  Waves,
-  Footprints,
-  BarChart3,
-} from "lucide-react"
+import 
+{ Activity,
+ Zap,
+ Bike,
+ Dumbbell,
+ Heart,
+ Loader2,
+ CheckCircle2,
+ AlertCircle,
+ Save,
+ Calendar,
+ Clock,
+ Gauge,
+ Plus,
+ Trash2,
+ GripVertical,
+ Target,
+ Flame,
+ Mountain,
+ Waves,
+ Footprints,
+ BarChart3,
+ CalendarRange
+}
+  from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
+import { AnnualPlanGenerator } from "@/components/annual-plan-generator"
 
 // ═══════════════════════════════════════════════════════════════════════════
 // TYPES & INTERFACES
@@ -54,6 +57,9 @@ interface AthleteDataType {
     hr_zones?: Record<string, unknown>
     is_current?: boolean
   }>
+  user?: {
+    full_name?: string
+  }
   [key: string]: unknown
 }
 
@@ -80,7 +86,7 @@ type ZoneType = "hr" | "power"
 interface WorkoutBlock {
   id: string
   type: "warmup" | "work" | "recovery" | "cooldown" | "rest"
-  duration: number // in minutes
+  duration: number
   zone: string
   sport: string
   description: string
@@ -104,22 +110,18 @@ interface AdvancedWorkoutBlock {
   blockType: AdvancedBlockType
   sport: string
   zoneType: ZoneType
-  // Durata
-  totalDuration: number // durata totale in minuti
-  intervalDuration?: number // durata singolo intervallo in minuti (per intervalli)
-  numIntervals?: number // numero di intervalli
-  // Zone
-  primaryZone: string // zona principale (Z1-Z7)
-  secondaryZone?: string // zona secondaria (per intervalli a 2 intensità)
-  tertiaryZone?: string // zona terziaria (per intervalli a 3 intensità)
-  // Target
+  totalDuration: number
+  intervalDuration?: number
+  numIntervals?: number
+  primaryZone: string
+  secondaryZone?: string
+  tertiaryZone?: string
   hrMin?: number
   hrMax?: number
   powerMin?: number
   powerMax?: number
-  // Altri
   description: string
-  restBetweenIntervals?: number // secondi di recupero tra intervalli
+  restBetweenIntervals?: number
 }
 
 interface GymExercise {
@@ -149,7 +151,7 @@ interface TrainingSession {
   blocks?: WorkoutBlock[]
   gymExercises?: GymExercise[]
   zoneType?: ZoneType
-  advancedBlocks?: AdvancedWorkoutBlock[] //
+  advancedBlocks?: AdvancedWorkoutBlock[]
 }
 
 interface VyriaTrainingPlanProps {
@@ -289,12 +291,7 @@ const calculatePowerZones = (ftp: number): PowerZoneData => {
     z4: { name: "Threshold", min: Math.round(ftp * 0.91), max: Math.round(ftp * 1.05), percent: { min: 91, max: 105 } },
     z5: { name: "VO2max", min: Math.round(ftp * 1.06), max: Math.round(ftp * 1.2), percent: { min: 106, max: 120 } },
     z6: { name: "Anaerobic", min: Math.round(ftp * 1.21), max: Math.round(ftp * 1.5), percent: { min: 121, max: 150 } },
-    z7: {
-      name: "Neuromuscular",
-      min: Math.round(ftp * 1.51),
-      max: Math.round(ftp * 2.0),
-      percent: { min: 151, max: 200 },
-    },
+    z7: { name: "Neuromuscular", min: Math.round(ftp * 1.51), max: Math.round(ftp * 2.0), percent: { min: 151, max: 200 } },
   }
 }
 
@@ -392,8 +389,7 @@ function WorkoutBlockComponent({
             <span className="text-xs text-muted-foreground">x</span>
           </div>
         )}
-
-        <Input
+                <Input
           value={block.description}
           onChange={(e) => onUpdate({ ...block, description: e.target.value })}
           placeholder="Note..."
@@ -428,7 +424,6 @@ function AdvancedWorkoutBlockComponent({
   const needsSecondaryZone = block.blockType === "intervals_2" || block.blockType === "intervals_3"
   const needsTertiaryZone = block.blockType === "intervals_3"
 
-  // Calcola target HR/Power dalla zona selezionata
   const getZoneTargets = (zoneName: string) => {
     if (block.zoneType === "power" && powerZones) {
       const zoneKey = zoneName.toLowerCase() as keyof PowerZoneData
@@ -460,7 +455,6 @@ function AdvancedWorkoutBlockComponent({
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        {/* Tipo Blocco */}
         <div className="space-y-1">
           <Label className="text-xs text-muted-foreground">Tipo Blocco</Label>
           <Select
@@ -481,7 +475,6 @@ function AdvancedWorkoutBlockComponent({
           </Select>
         </div>
 
-        {/* Zones Type HR/Power */}
         <div className="space-y-1">
           <Label className="text-xs text-muted-foreground">Metrica</Label>
           <Select value={block.zoneType} onValueChange={(v) => onUpdate({ ...block, zoneType: v as ZoneType })}>
@@ -505,7 +498,6 @@ function AdvancedWorkoutBlockComponent({
           </Select>
         </div>
 
-        {/* Durata Totale */}
         <div className="space-y-1">
           <Label className="text-xs text-muted-foreground">Durata Totale (min)</Label>
           <Input
@@ -517,7 +509,6 @@ function AdvancedWorkoutBlockComponent({
           />
         </div>
 
-        {/* Zona Principale */}
         <div className="space-y-1">
           <Label className="text-xs text-muted-foreground">Zona Principale</Label>
           <Select value={block.primaryZone} onValueChange={(v) => onUpdate({ ...block, primaryZone: v })}>
@@ -538,10 +529,8 @@ function AdvancedWorkoutBlockComponent({
         </div>
       </div>
 
-      {/* Riga Intervalli (solo per tipi intervallo) */}
       {needsIntervals && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 pt-2 border-t border-slate-700">
-          {/* Durata Intervallo */}
           <div className="space-y-1">
             <Label className="text-xs text-muted-foreground">Durata Intervallo (min)</Label>
             <Input
@@ -553,7 +542,6 @@ function AdvancedWorkoutBlockComponent({
             />
           </div>
 
-          {/* Numero Intervalli */}
           <div className="space-y-1">
             <Label className="text-xs text-muted-foreground">Numero Intervalli</Label>
             <Input
@@ -565,7 +553,6 @@ function AdvancedWorkoutBlockComponent({
             />
           </div>
 
-          {/* Recupero tra Intervalli */}
           <div className="space-y-1">
             <Label className="text-xs text-muted-foreground">Recupero (sec)</Label>
             <Input
@@ -578,7 +565,6 @@ function AdvancedWorkoutBlockComponent({
             />
           </div>
 
-          {/* Zona Secondaria */}
           {needsSecondaryZone && (
             <div className="space-y-1">
               <Label className="text-xs text-muted-foreground">Zona Secondaria</Label>
@@ -605,7 +591,6 @@ function AdvancedWorkoutBlockComponent({
         </div>
       )}
 
-      {/* Zona Terziaria (solo per intervalli a 3 intensità) */}
       {needsTertiaryZone && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <div className="space-y-1">
@@ -629,7 +614,6 @@ function AdvancedWorkoutBlockComponent({
         </div>
       )}
 
-      {/* Preview Target */}
       <div className="flex flex-wrap gap-2 pt-2 border-t border-slate-700">
         {primaryTargets && (
           <Badge className={`${ZONE_COLORS[block.primaryZone]} text-xs`}>
@@ -648,7 +632,6 @@ function AdvancedWorkoutBlockComponent({
         )}
       </div>
 
-      {/* Descrizione */}
       <Input
         value={block.description}
         onChange={(e) => onUpdate({ ...block, description: e.target.value })}
@@ -659,7 +642,6 @@ function AdvancedWorkoutBlockComponent({
   )
 }
 
-// Add WorkoutVisualizationChart component here
 function WorkoutVisualizationChart({
   blocks,
   hrZones,
@@ -673,13 +655,11 @@ function WorkoutVisualizationChart({
 
   const totalDuration = blocks.reduce((sum, b) => sum + b.totalDuration, 0)
 
-  // Calculate height based on zone intensity
   const getZoneHeight = (zone: string): number => {
     const zoneNum = Number.parseInt(zone.replace("Z", ""))
-    return Math.min(100, (zoneNum / 7) * 100 + 20) // Min 20%, max 100%
+    return Math.min(100, (zoneNum / 7) * 100 + 20)
   }
 
-  // Generate visual blocks for each workout block
   const generateVisualSegments = (block: AdvancedWorkoutBlock) => {
     const segments: { zone: string; duration: number; label: string }[] = []
 
@@ -688,7 +668,6 @@ function WorkoutVisualizationChart({
         segments.push({ zone: block.primaryZone, duration: block.totalDuration, label: "Costante" })
         break
       case "increment":
-        // Divide into 3-4 progressive segments
         const incSegments = 4
         const incDuration = block.totalDuration / incSegments
         for (let i = 0; i < incSegments; i++) {
@@ -697,7 +676,6 @@ function WorkoutVisualizationChart({
         }
         break
       case "decrement":
-        // Divide into 3-4 regressive segments
         const decSegments = 4
         const decDuration = block.totalDuration / decSegments
         for (let i = 0; i < decSegments; i++) {
@@ -706,10 +684,9 @@ function WorkoutVisualizationChart({
         }
         break
       case "intervals_2":
-        // Alternate between primary and secondary zones
         const numInt2 = block.numIntervals || 4
         const intDur2 = block.intervalDuration || 3
-        const restDur2 = (block.restBetweenIntervals || 60) / 60 // Convert to minutes
+        const restDur2 = (block.restBetweenIntervals || 60) / 60
         for (let i = 0; i < numInt2; i++) {
           segments.push({ zone: block.primaryZone, duration: intDur2, label: `Int ${i + 1}` })
           if (i < numInt2 - 1 && restDur2 > 0) {
@@ -718,7 +695,6 @@ function WorkoutVisualizationChart({
         }
         break
       case "intervals_3":
-        // Cycle through 3 zones
         const numInt3 = block.numIntervals || 3
         const intDur3 = block.intervalDuration || 3
         const restDur3 = (block.restBetweenIntervals || 60) / 60
@@ -754,7 +730,6 @@ function WorkoutVisualizationChart({
         <span className="text-xs text-muted-foreground">{totalDuration} min totali</span>
       </div>
 
-      {/* Chart Container */}
       <div className="relative h-32 bg-slate-900/50 rounded-lg border border-slate-700 p-2">
         <div className="flex items-end h-full gap-0.5">
           {allSegments.map((segment, index) => {
@@ -771,7 +746,6 @@ function WorkoutVisualizationChart({
                   minWidth: "8px",
                 }}
               >
-                {/* Tooltip on hover */}
                 <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 opacity-0 group-hover:opacity-100 transition-opacity z-10 pointer-events-none">
                   <div className="bg-slate-800 text-white text-[10px] px-2 py-1 rounded shadow-lg whitespace-nowrap">
                     <div className="font-semibold">{segment.zone}</div>
@@ -783,7 +757,6 @@ function WorkoutVisualizationChart({
           })}
         </div>
 
-        {/* Time axis */}
         <div className="absolute bottom-0 left-0 right-0 flex justify-between text-[10px] text-muted-foreground px-2 -mb-5">
           <span>0</span>
           <span>{Math.round(segmentTotalDuration / 4)}</span>
@@ -793,7 +766,6 @@ function WorkoutVisualizationChart({
         </div>
       </div>
 
-      {/* Zone Legend */}
       <div className="flex flex-wrap gap-2 pt-4">
         {["Z1", "Z2", "Z3", "Z4", "Z5", "Z6", "Z7"].map((zone) => {
           const hasZone = allSegments.some((s) => s.zone === zone)
@@ -841,14 +813,12 @@ function GymExerciseRow({
     setLocalWeight(value)
     onUpdate({ ...exercise, weight: value })
   }
-
-  const handleRestChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleRestChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = Number.parseInt(e.target.value) || 0
     setLocalRest(value)
     onUpdate({ ...exercise, restBetweenSets: value })
   }
 
-  // Category label mapping
   const categoryLabels: Record<string, string> = {
     strength: "Forza",
     core: "Core",
@@ -1029,21 +999,17 @@ function WeeklyCalendarView({
 export default function VyriaTrainingPlan({ athleteData, userName }: VyriaTrainingPlanProps) {
   const supabase = createClient()
 
-  // State - Sport & Zone Type
   const [primarySport, setPrimarySport] = useState<string>("cycling")
   const [zoneType, setZoneType] = useState<ZoneType>("hr")
 
-  // State - HR Zones Configuration
   const [hrMax, setHrMax] = useState<number>(190)
   const [hrThreshold, setHrThreshold] = useState<number>(170)
   const [hrResting, setHrResting] = useState<number>(60)
   const [hrZones, setHRZones] = useState<HRZoneData | null>(null)
 
-  // State - Power Zones
   const [ftp, setFtp] = useState<number>(250)
   const [powerZones, setPowerZones] = useState<PowerZoneData | null>(null)
 
-  // State - Training Plan Generation
   const [trainingVolume, setTrainingVolume] = useState<"low" | "medium" | "high">("medium")
   const [trainingFocus, setTrainingFocus] = useState<"endurance" | "balanced" | "intensity">("balanced")
   const [generatedPlan, setGeneratedPlan] = useState<TrainingSession[]>([])
@@ -1052,25 +1018,32 @@ export default function VyriaTrainingPlan({ athleteData, userName }: VyriaTraini
   const [editingSession, setEditingSession] = useState<TrainingSession | null>(null)
   const [currentBlocks, setCurrentBlocks] = useState<WorkoutBlock[]>([])
   const [currentGymExercises, setCurrentGymExercises] = useState<GymExercise[]>([])
-  // State for advanced blocks
   const [currentAdvancedBlocks, setCurrentAdvancedBlocks] = useState<AdvancedWorkoutBlock[]>([])
   const [showWorkoutBuilder, setShowWorkoutBuilder] = useState(false)
   const [builderSport, setBuilderSport] = useState<string>("cycling")
   const [builderZoneType, setBuilderZoneType] = useState<ZoneType>("hr")
 
-  // State - UI
   const [isGenerating, setIsGenerating] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [saveStatus, setSaveStatus] = useState<"idle" | "success" | "error">("idle")
   const [errorMessage, setErrorMessage] = useState<string>("")
   const [activeTab, setActiveTab] = useState("zones")
 
+  const [annualPlanSettings, setAnnualPlanSettings] = useState<{
+    goal?: string
+    focus?: string
+    duration?: number
+    weeks?: number
+    startDate?: string
+  }>({})
+  const [isGeneratingAnnualPlan, setIsGeneratingAnnualPlan] = useState(false)
+  const [generatedAnnualPlan, setGeneratedAnnualPlan] = useState<any[]>([])
+
   useEffect(() => {
     if (athleteData?.metabolic_profiles) {
       const currentProfile =
         athleteData.metabolic_profiles.find((p) => p.is_current) || athleteData.metabolic_profiles[0]
       if (currentProfile) {
-        // Load HR data
         if (currentProfile.hr_max && currentProfile.hr_max > 0) {
           setHrMax(currentProfile.hr_max)
         }
@@ -1080,11 +1053,9 @@ export default function VyriaTrainingPlan({ athleteData, userName }: VyriaTraini
         if (currentProfile.hr_rest && currentProfile.hr_rest > 0) {
           setHrResting(currentProfile.hr_rest)
         }
-        // Load FTP data
         if (currentProfile.ftp_watts && currentProfile.ftp_watts > 0) {
           setFtp(currentProfile.ftp_watts)
         }
-        // Load saved HR zones if available
         if (currentProfile.hr_zones && typeof currentProfile.hr_zones === "object") {
           const savedZones = currentProfile.hr_zones as HRZoneData
           if (savedZones.z1 && savedZones.z2 && savedZones.z3 && savedZones.z4 && savedZones.z5) {
@@ -1107,7 +1078,6 @@ export default function VyriaTrainingPlan({ athleteData, userName }: VyriaTraini
   const builderSportData = SPORTS.find((s) => s.id === builderSport)
   const builderSupportsPower = builderSportData?.supportsPower ?? false
 
-  // Initialize empty week if no plan
   const initializeEmptyWeek = (): TrainingSession[] => {
     return DAY_NAMES.map((dayName, index) => ({
       day: index,
@@ -1121,12 +1091,10 @@ export default function VyriaTrainingPlan({ athleteData, userName }: VyriaTraini
       description: "Giorno di riposo",
       blocks: [],
       gymExercises: [],
-      // Initialize advancedBlocks
       advancedBlocks: [],
     }))
   }
 
-  // Handle generate training plan
   const handleGeneratePlan = async () => {
     setIsGenerating(true)
     setErrorMessage("")
@@ -1161,7 +1129,6 @@ export default function VyriaTrainingPlan({ athleteData, userName }: VyriaTraini
     }
   }
 
-  // Generate weekly training plan
   const generateWeeklyTrainingPlan = (
     sport: string,
     volume: "low" | "medium" | "high",
@@ -1266,11 +1233,9 @@ export default function VyriaTrainingPlan({ athleteData, userName }: VyriaTraini
     return sessions
   }
 
-  // Generate default blocks for a workout
   const generateDefaultBlocks = (type: string, zone: string, duration: number, sport: string): WorkoutBlock[] => {
     const blocks: WorkoutBlock[] = []
 
-    // Warmup
     blocks.push({
       id: generateId(),
       type: "warmup",
@@ -1279,8 +1244,7 @@ export default function VyriaTrainingPlan({ athleteData, userName }: VyriaTraini
       sport,
       description: "Riscaldamento progressivo",
     })
-
-    // Main work
+        // Main work
     if (type === "intervals") {
       const intervalDuration = Math.round(duration * 0.6)
       const reps = 4
@@ -1315,7 +1279,6 @@ export default function VyriaTrainingPlan({ athleteData, userName }: VyriaTraini
       })
     }
 
-    // Cooldown
     blocks.push({
       id: generateId(),
       type: "cooldown",
@@ -1328,7 +1291,6 @@ export default function VyriaTrainingPlan({ athleteData, userName }: VyriaTraini
     return blocks
   }
 
-  // Handle save training plan
   const handleSavePlan = async () => {
     if (!athleteData?.id || generatedPlan.length === 0) {
       setErrorMessage("Missing required data to save plan")
@@ -1343,7 +1305,7 @@ export default function VyriaTrainingPlan({ athleteData, userName }: VyriaTraini
       const getNextWeekday = (dayIndex: number) => {
         const today = new Date()
         const currentDay = today.getDay()
-        const targetDay = dayIndex + 1 // Monday = 1
+        const targetDay = dayIndex + 1
         let daysUntil = targetDay - currentDay
         if (daysUntil <= 0) daysUntil += 7
         const targetDate = new Date(today)
@@ -1351,8 +1313,8 @@ export default function VyriaTrainingPlan({ athleteData, userName }: VyriaTraini
         return targetDate.toISOString().split("T")[0]
       }
 
-      const mondayDate = getNextWeekday(0) // Get Monday
-      const sundayDate = getNextWeekday(6) // Get Sunday
+      const mondayDate = getNextWeekday(0)
+      const sundayDate = getNextWeekday(6)
 
       const { error: deleteError } = await supabase
         .from("training_activities")
@@ -1366,7 +1328,6 @@ export default function VyriaTrainingPlan({ athleteData, userName }: VyriaTraini
       }
 
       for (const session of generatedPlan) {
-        // Only save sessions that have content
         if (
           session.duration > 0 ||
           (session.blocks && session.blocks.length > 0) ||
@@ -1374,7 +1335,6 @@ export default function VyriaTrainingPlan({ athleteData, userName }: VyriaTraini
         ) {
           const activityDate = getNextWeekday(session.day)
 
-          // Prepare workout data
           const workoutData = {
             blocks: session.blocks || [],
             advancedBlocks: session.advancedBlocks || [],
@@ -1408,7 +1368,6 @@ export default function VyriaTrainingPlan({ athleteData, userName }: VyriaTraini
         }
       }
 
-      // Save sport config
       const sportConfigPayload = {
         athlete_id: athleteData.id,
         sport: primarySport,
@@ -1426,11 +1385,9 @@ export default function VyriaTrainingPlan({ athleteData, userName }: VyriaTraini
 
       if (configError) {
         console.log("[v0] Sport config error (non-critical):", configError)
-        // Don't throw - sport_configs might not exist
       }
 
       if (zoneType === "hr" && hrZones) {
-        // Recovery = Z1 Power, Endurance = Z2 Power, etc.
         const hrZonesWithConsumption = {
           z1: {
             ...hrZones.z1,
@@ -1486,7 +1443,6 @@ export default function VyriaTrainingPlan({ athleteData, userName }: VyriaTraini
 
         if (zonesError) {
           console.log("[v0] HR zones error (non-critical):", zonesError)
-          // Don't throw - hr_zones might not exist
         }
       }
 
@@ -1507,13 +1463,11 @@ export default function VyriaTrainingPlan({ athleteData, userName }: VyriaTraini
       const zones = calculateHRZones(hrMax, hrThreshold)
       setHRZones(zones)
 
-      // Save to database
       if (athleteData?.id) {
         setIsSaving(true)
         try {
           const supabase = createClient()
 
-          // Recovery = Z1 Power, Endurance = Z2 Power, etc.
           const hrZonesWithConsumption = {
             z1: {
               ...zones.z1,
@@ -1560,7 +1514,6 @@ export default function VyriaTrainingPlan({ athleteData, userName }: VyriaTraini
 
           if (error) {
             console.log("[v0] Error saving HR zones:", error)
-            // Try insert if update fails
             const { error: insertError } = await supabase.from("metabolic_profiles").insert({
               athlete_id: athleteData.id,
               hr_max: hrMax,
@@ -1587,7 +1540,6 @@ export default function VyriaTrainingPlan({ athleteData, userName }: VyriaTraini
       const zones = calculatePowerZones(ftp)
       setPowerZones(zones)
 
-      // Save FTP to database
       if (athleteData?.id) {
         setIsSaving(true)
         try {
@@ -1618,7 +1570,6 @@ export default function VyriaTrainingPlan({ athleteData, userName }: VyriaTraini
     setEditingSession(session || null)
     setCurrentBlocks(session?.blocks || [])
     setCurrentGymExercises(session?.gymExercises || [])
-    // Load advanced blocks
     setCurrentAdvancedBlocks(session?.advancedBlocks || [])
     setBuilderSport(session?.sport || primarySport)
     setBuilderZoneType(session?.zoneType || zoneType)
@@ -1645,15 +1596,14 @@ export default function VyriaTrainingPlan({ athleteData, userName }: VyriaTraini
     setCurrentBlocks(currentBlocks.filter((b) => b.id !== blockId))
   }
 
-  // Handlers for Advanced Blocks
   const handleAddAdvancedBlock = () => {
     const newBlock: AdvancedWorkoutBlock = {
       id: generateId(),
-      blockType: "constant", // default
+      blockType: "constant",
       sport: builderSport,
       zoneType: builderZoneType,
       totalDuration: 15,
-      primaryZone: "Z2", // default
+      primaryZone: "Z2",
       description: "",
     }
     setCurrentAdvancedBlocks([...currentAdvancedBlocks, newBlock])
@@ -1693,9 +1643,8 @@ export default function VyriaTrainingPlan({ athleteData, userName }: VyriaTraini
   const handleSaveWorkout = () => {
     if (selectedDay === null) return
 
-    // Calculate total duration based on the active block type
     let totalDuration = 0
-    let mainZone = "Z2" // Default zone
+    let mainZone = "Z2"
 
     if (builderSport !== "gym") {
       if (currentAdvancedBlocks.length > 0) {
@@ -1705,13 +1654,12 @@ export default function VyriaTrainingPlan({ athleteData, userName }: VyriaTraini
             (b) => b.blockType === "constant" || b.blockType === "increment" || b.blockType === "decrement",
           )?.primaryZone || currentAdvancedBlocks[0].primaryZone
       } else {
-        // Fallback to legacy blocks if no advanced blocks
         totalDuration = currentBlocks.reduce((sum, b) => sum + b.duration * (b.repetitions || 1), 0)
         mainZone = currentBlocks.find((b) => b.type === "work")?.zone || "Z2"
       }
     } else {
-      totalDuration = Math.round(currentGymExercises.reduce((sum, e) => sum + e.sets, 0) * 2) // Estimate ~2 min per set
-      mainZone = "Z1" // Gym doesn't strictly follow zone model
+      totalDuration = Math.round(currentGymExercises.reduce((sum, e) => sum + e.sets, 0) * 2)
+      mainZone = "Z1"
     }
 
     const updatedSession: TrainingSession = {
@@ -1727,10 +1675,10 @@ export default function VyriaTrainingPlan({ athleteData, userName }: VyriaTraini
       powerMax: powerZones?.[mainZone.toLowerCase() as keyof PowerZoneData]?.max,
       description: builderSport === "gym" ? "Allenamento palestra" : "Allenamento personalizzato",
       tss: calculateTSS(totalDuration, mainZone),
-      blocks: currentBlocks, // Keep legacy blocks for backward compatibility/simplicity if needed
+      blocks: currentBlocks,
       gymExercises: currentGymExercises,
+            gymExercises: currentGymExercises,
       zoneType: builderZoneType,
-      // Add advanced blocks
       advancedBlocks: currentAdvancedBlocks,
     }
 
@@ -1748,12 +1696,11 @@ export default function VyriaTrainingPlan({ athleteData, userName }: VyriaTraini
     setSelectedDay(null)
     setCurrentBlocks([])
     setCurrentGymExercises([])
-    setCurrentAdvancedBlocks([]) // Reset advanced blocks
+    setCurrentAdvancedBlocks([])
   }
 
   const zonesCalculated = zoneType === "hr" ? hrZones !== null : powerZones !== null
 
-  // Initialize plan if empty
   if (generatedPlan.length === 0 && activeTab === "week") {
     setGeneratedPlan(initializeEmptyWeek())
   }
@@ -1772,7 +1719,6 @@ export default function VyriaTrainingPlan({ athleteData, userName }: VyriaTraini
 
   return (
     <div className="space-y-6 p-4 md:p-8">
-      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <div className="flex items-center gap-2">
@@ -1783,7 +1729,6 @@ export default function VyriaTrainingPlan({ athleteData, userName }: VyriaTraini
         </div>
       </div>
 
-      {/* Error Display */}
       {errorMessage && (
         <Card className="border-red-900/50 bg-red-950/20">
           <CardContent className="p-4 flex items-start gap-3">
@@ -1793,9 +1738,12 @@ export default function VyriaTrainingPlan({ athleteData, userName }: VyriaTraini
         </Card>
       )}
 
-      {/* Main Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
+          <TabsTrigger value="annual" className="flex items-center gap-2">
+            <CalendarRange className="h-4 w-4" />
+            <span className="hidden sm:inline">Piano Annuale</span>
+          </TabsTrigger>
           <TabsTrigger value="zones" className="flex items-center gap-2">
             <Heart className="h-4 w-4" />
             <span className="hidden sm:inline">Zone</span>
@@ -1814,7 +1762,17 @@ export default function VyriaTrainingPlan({ athleteData, userName }: VyriaTraini
           </TabsTrigger>
         </TabsList>
 
-        {/* Tab: Zones Configuration */}
+        <TabsContent value="annual" className="space-y-4">
+          <AnnualPlanGenerator
+            athleteData={athleteData}
+            userName={athleteData.user?.full_name}
+            onPlanGenerated={(plan) => {
+              setGeneratedAnnualPlan([plan])
+              console.log("Annual plan generated:", plan)
+            }}
+          />
+        </TabsContent>
+
         <TabsContent value="zones" className="space-y-4">
           <Card>
             <CardHeader>
@@ -1829,7 +1787,6 @@ export default function VyriaTrainingPlan({ athleteData, userName }: VyriaTraini
               <CardDescription>Configura le zone per {selectedSport?.name || primarySport}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              {/* Sport Selection */}
               <div className="grid gap-4">
                 <Label>Sport Principale</Label>
                 <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2">
@@ -1863,7 +1820,6 @@ export default function VyriaTrainingPlan({ athleteData, userName }: VyriaTraini
                 </div>
               </div>
 
-              {/* Zone Type Selection */}
               <div className="space-y-3">
                 <Label>Tipo di Zone</Label>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -1901,7 +1857,6 @@ export default function VyriaTrainingPlan({ athleteData, userName }: VyriaTraini
                 </div>
               </div>
 
-              {/* HR Parameters */}
               {zoneType === "hr" && (
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="space-y-2">
@@ -1940,7 +1895,6 @@ export default function VyriaTrainingPlan({ athleteData, userName }: VyriaTraini
                 </div>
               )}
 
-              {/* Power Parameters */}
               {zoneType === "power" && (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
@@ -1965,7 +1919,6 @@ export default function VyriaTrainingPlan({ athleteData, userName }: VyriaTraini
                 </div>
               )}
 
-              {/* HR Zones Display */}
               {zoneType === "hr" && hrZones && (
                 <div className="space-y-3 mt-6">
                   <h3 className="font-semibold text-lg">Zone FC Calcolate</h3>
@@ -1992,7 +1945,6 @@ export default function VyriaTrainingPlan({ athleteData, userName }: VyriaTraini
                 </div>
               )}
 
-              {/* Power Zones Display */}
               {zoneType === "power" && powerZones && (
                 <div className="space-y-3 mt-6">
                   <h3 className="font-semibold text-lg">Zone Potenza Calcolate</h3>
@@ -2033,7 +1985,6 @@ export default function VyriaTrainingPlan({ athleteData, userName }: VyriaTraini
           </Card>
         </TabsContent>
 
-        {/* Tab: Plan Generation */}
         <TabsContent value="generation" className="space-y-4">
           <Card>
             <CardHeader>
@@ -2044,7 +1995,6 @@ export default function VyriaTrainingPlan({ athleteData, userName }: VyriaTraini
               <CardDescription>Genera il tuo piano settimanale basato sui tuoi obiettivi</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              {/* Training Volume */}
               <div className="space-y-3">
                 <Label>Volume di Allenamento</Label>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
@@ -2073,7 +2023,6 @@ export default function VyriaTrainingPlan({ athleteData, userName }: VyriaTraini
                 </div>
               </div>
 
-              {/* Training Focus */}
               <div className="space-y-3">
                 <Label>Focus Allenamento</Label>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
@@ -2102,7 +2051,6 @@ export default function VyriaTrainingPlan({ athleteData, userName }: VyriaTraini
                 </div>
               </div>
 
-              {/* Zone Type Reminder */}
               <div className="p-3 rounded-lg bg-slate-900/50 border border-slate-800">
                 <div className="flex items-center gap-2 text-sm">
                   {zoneType === "hr" ? (
@@ -2149,6 +2097,27 @@ export default function VyriaTrainingPlan({ athleteData, userName }: VyriaTraini
               )}
             </CardContent>
           </Card>
+
+          <Card className="mt-8">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <CalendarRange className="h-5 w-5 text-blue-500" />
+                Generatore Piano Annuale
+              </CardTitle>
+              <CardDescription>Definisci gli obiettivi e le fasi per creare un piano annuale completo</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <AnnualPlanGenerator
+                athleteData={athleteData}
+                userName={athleteData.user?.full_name}
+                onPlanGenerated={(plan) => {
+                  setGeneratedAnnualPlan([plan])
+                  console.log("Annual plan generated:", plan)
+                                    console.log("Annual plan generated:", plan)
+                }}
+              />
+            </CardContent>
+          </Card>
         </TabsContent>
 
         {/* Tab: Weekly View */}
@@ -2186,7 +2155,6 @@ export default function VyriaTrainingPlan({ athleteData, userName }: VyriaTraini
               </div>
             </CardHeader>
             <CardContent>
-              {/* Save Status */}
               {saveStatus === "success" && (
                 <div className="mb-4 p-3 rounded-lg border border-green-900/50 bg-green-950/20 flex items-center gap-3">
                   <CheckCircle2 className="h-5 w-5 text-green-500" />
@@ -2194,7 +2162,6 @@ export default function VyriaTrainingPlan({ athleteData, userName }: VyriaTraini
                 </div>
               )}
 
-              {/* Weekly Calendar */}
               <WeeklyCalendarView
                 sessions={generatedPlan}
                 onEditSession={handleOpenWorkoutBuilder}
@@ -2202,7 +2169,6 @@ export default function VyriaTrainingPlan({ athleteData, userName }: VyriaTraini
                 zoneType={zoneType}
               />
 
-              {/* Weekly Stats */}
               {generatedPlan.length > 0 && (
                 <Card className="mt-4 bg-slate-900/50">
                   <CardContent className="p-4">
@@ -2244,7 +2210,6 @@ export default function VyriaTrainingPlan({ athleteData, userName }: VyriaTraini
               <CardDescription>Crea allenamenti di forza e condizionamento</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              {/* Exercise Categories */}
               {(Object.keys(GYM_EXERCISES) as Array<keyof typeof GYM_EXERCISES>).map((category) => (
                 <div key={category} className="space-y-3">
                   <h3 className="font-semibold capitalize flex items-center gap-2">
@@ -2267,7 +2232,6 @@ export default function VyriaTrainingPlan({ athleteData, userName }: VyriaTraini
                           handleAddGymExercise(exercise.id, category)
                           setBuilderSport("gym")
                           setShowWorkoutBuilder(true)
-                          // Try to find a rest day or the first available day to add the gym session
                           const restDayIndex = generatedPlan.findIndex((s) => s.duration === 0 && s.sport === "")
                           const firstAvailableIndex = generatedPlan.findIndex((s) => s.duration === 0 || s.sport === "")
                           setSelectedDay(
@@ -2283,7 +2247,6 @@ export default function VyriaTrainingPlan({ athleteData, userName }: VyriaTraini
                 </div>
               ))}
 
-              {/* Gym sessions in the week */}
               <div className="mt-6">
                 <h3 className="font-semibold mb-3">Sessioni Palestra nella Settimana</h3>
                 <div className="space-y-2">
@@ -2327,7 +2290,6 @@ export default function VyriaTrainingPlan({ athleteData, userName }: VyriaTraini
           </DialogHeader>
 
           <div className="flex-1 overflow-y-auto space-y-4 py-4">
-            {/* Sport Selection in Builder */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Sport</Label>
@@ -2348,7 +2310,6 @@ export default function VyriaTrainingPlan({ athleteData, userName }: VyriaTraini
                 </Select>
               </div>
 
-              {/* Zone Type in Builder */}
               {builderSport !== "gym" && (
                 <div className="space-y-2">
                   <Label>Tipo Zone</Label>
@@ -2379,7 +2340,6 @@ export default function VyriaTrainingPlan({ athleteData, userName }: VyriaTraini
               )}
             </div>
 
-            {/* Workout Blocks (for non-gym sports) */}
             {builderSport !== "gym" && (
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
@@ -2411,7 +2371,6 @@ export default function VyriaTrainingPlan({ athleteData, userName }: VyriaTraini
                   </div>
                 </ScrollArea>
 
-                {/* Block Summary */}
                 {currentAdvancedBlocks.length > 0 && (
                   <>
                     <WorkoutVisualizationChart
@@ -2454,7 +2413,6 @@ export default function VyriaTrainingPlan({ athleteData, userName }: VyriaTraini
                 )}
               </div>
             )}
-            {/* Fallback to legacy blocks if no advanced blocks are present or for simplicity */}
             {builderSport !== "gym" && currentAdvancedBlocks.length === 0 && (
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
@@ -2487,7 +2445,6 @@ export default function VyriaTrainingPlan({ athleteData, userName }: VyriaTraini
                   </div>
                 </ScrollArea>
 
-                {/* Block Summary */}
                 {currentBlocks.length > 0 && (
                   <div className="p-3 rounded-lg bg-slate-900/50 border border-slate-700">
                     <div className="grid grid-cols-3 gap-4 text-sm">
@@ -2516,14 +2473,12 @@ export default function VyriaTrainingPlan({ athleteData, userName }: VyriaTraini
               </div>
             )}
 
-            {/* Gym Exercises */}
             {builderSport === "gym" && (
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <Label>Esercizi</Label>
                 </div>
 
-                {/* Quick Add Exercise */}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                   {(Object.keys(GYM_EXERCISES) as Array<keyof typeof GYM_EXERCISES>).map((category) => (
                     <Select key={category} onValueChange={(v) => handleAddGymExercise(v, category)}>
@@ -2560,7 +2515,6 @@ export default function VyriaTrainingPlan({ athleteData, userName }: VyriaTraini
                   </div>
                 </ScrollArea>
 
-                {/* Gym Summary */}
                 {currentGymExercises.length > 0 && (
                   <div className="p-3 rounded-lg bg-slate-900/50 border border-slate-700">
                     <div className="grid grid-cols-3 gap-4 text-sm">
