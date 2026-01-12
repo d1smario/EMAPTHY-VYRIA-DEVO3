@@ -834,3 +834,4 @@ export function WorkoutLibrary({ athleteId, coachId, onSelectWorkout, selectedDa
     </div>
   )
 }
+
