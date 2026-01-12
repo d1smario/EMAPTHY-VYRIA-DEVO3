@@ -1,13 +1,14 @@
 "use client"
-
 import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
+import { Input } from "@/components/ui/input"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Slider } from "@/components/ui/slider"
+import { Textarea } from "@/components/ui/textarea"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -38,6 +39,9 @@ import {
   Heart,
   BookOpen,
   Settings,
+  X,
+  ChevronUp,
+  ChevronDown,
 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { AnnualPlanGenerator } from "./annual-plan-generator"
@@ -65,6 +69,7 @@ interface AthleteDataType {
   user?: {
     full_name?: string
   }
+  weight_kg?: number
   [key: string]: unknown
 }
 
@@ -88,11 +93,10 @@ interface PowerZoneData {
 
 interface WorkoutBlock {
   id: string
-  type: "warmup" | "steady" | "interval" | "recovery" | "cooldown"
+  type: string
   duration: number
   zone: string
-  intensity: number
-  cadenceTarget?: number
+  intensity?: number
   intervalDuration?: number
   intervalDurationUnit?: "min" | "sec"
   numIntervals?: number
@@ -102,7 +106,7 @@ interface WorkoutBlock {
 
 interface TrainingSession {
   sessionId: string
-  dayIndex: number
+  dayIndex: number // Changed from day to dayIndex
   sport: string
   workoutType: string
   title: string
@@ -111,7 +115,6 @@ interface TrainingSession {
   targetZone: string
   blocks: WorkoutBlock[]
   tss?: number
-  metabolicGoal?: string
   gymExercises?: Array<{
     name: string
     sets: number
@@ -120,11 +123,13 @@ interface TrainingSession {
     rest?: number
     notes?: string
   }>
+  completed?: boolean
 }
 
 interface VyriaTrainingPlanProps {
   athleteData: AthleteDataType | null
   userName?: string | null
+  onUpdate?: () => void
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -137,19 +142,7 @@ const SPORTS = [
   { id: "swimming", name: "Nuoto", icon: Waves },
   { id: "triathlon", name: "Triathlon", icon: Activity },
   { id: "trail_running", name: "Trail Running", icon: Mountain },
-  { id: "mountain_bike", name: "MTB", icon: Bike },
-  { id: "gravel", name: "Gravel", icon: Bike },
   { id: "gym", name: "Palestra", icon: Dumbbell },
-]
-
-const WORKOUT_TYPES = [
-  { id: "endurance", name: "Endurance", zone: "Z2" },
-  { id: "tempo", name: "Tempo", zone: "Z3" },
-  { id: "threshold", name: "Soglia", zone: "Z4" },
-  { id: "vo2max", name: "VO2max", zone: "Z5" },
-  { id: "anaerobic", name: "Anaerobico", zone: "Z6" },
-  { id: "sprint", name: "Sprint", zone: "Z7" },
-  { id: "recovery", name: "Recupero", zone: "Z1" },
 ]
 
 const DAY_NAMES = ["Lunedì", "Martedì", "Mercoledì", "Giovedì", "Venerdì", "Sabato", "Domenica"]
@@ -165,20 +158,30 @@ const ZONE_COLORS: Record<string, string> = {
   GYM: "bg-purple-600",
 }
 
+const BLOCK_TYPES = [
+  { id: "warmup", name: "Riscaldamento", color: "bg-green-500", defaultZone: "Z1", defaultDuration: 10 },
+  { id: "endurance", name: "Endurance", color: "bg-blue-500", defaultZone: "Z2", defaultDuration: 30 },
+  { id: "tempo", name: "Tempo", color: "bg-yellow-500", defaultZone: "Z3", defaultDuration: 20 },
+  { id: "threshold", name: "Soglia", color: "bg-orange-500", defaultZone: "Z4", defaultDuration: 15 },
+  { id: "vo2max", name: "VO2max", color: "bg-red-500", defaultZone: "Z5", defaultDuration: 8 },
+  {
+    id: "intervals",
+    name: "Intervalli",
+    color: "bg-purple-500",
+    defaultZone: "Z4",
+    defaultDuration: 20,
+    hasIntervals: true,
+  },
+  { id: "cooldown", name: "Defaticamento", color: "bg-slate-500", defaultZone: "Z1", defaultDuration: 10 },
+]
+
+const ZONES = ["Z1", "Z2", "Z3", "Z4", "Z5", "Z6", "Z7"]
+
 // ═══════════════════════════════════════════════════════════════════════════
 // HELPER FUNCTIONS
 // ═══════════════════════════════════════════════════════════════════════════
 
 const generateId = () => Math.random().toString(36).substring(2, 9)
-
-const calculateBlockTotalDuration = (block: WorkoutBlock): number => {
-  if (block.type === "interval" && block.numIntervals && block.intervalDuration) {
-    const intervalSeconds = block.intervalDurationUnit === "sec" ? block.intervalDuration : block.intervalDuration * 60
-    const restSeconds = block.restBetweenIntervals || 0
-    return intervalSeconds * block.numIntervals + restSeconds * (block.numIntervals - 1)
-  }
-  return block.duration * 60
-}
 
 const getWeekDateRange = () => {
   const today = new Date()
@@ -187,11 +190,9 @@ const getWeekDateRange = () => {
   const monday = new Date(today)
   monday.setDate(today.getDate() + mondayOffset)
   monday.setHours(0, 0, 0, 0)
-
   const sunday = new Date(monday)
   sunday.setDate(monday.getDate() + 6)
   sunday.setHours(23, 59, 59, 999)
-
   return { monday, sunday }
 }
 
@@ -199,15 +200,15 @@ const getWeekDateRange = () => {
 // MAIN COMPONENT
 // ═══════════════════════════════════════════════════════════════════════════
 
-function VyriaTrainingPlan({ athleteData, userName }: VyriaTrainingPlanProps) {
+function VyriaTrainingPlan({ athleteData, userName, onUpdate }: VyriaTrainingPlanProps) {
   const supabase = createClient()
 
-  // State - Main
+  // State
   const [activeTab, setActiveTab] = useState("zones")
   const [saving, setSaving] = useState(false)
   const [loading, setLoading] = useState(false)
 
-  // State - Zones
+  // Zones State
   const [hrMax, setHrMax] = useState(190)
   const [hrThreshold, setHrThreshold] = useState(170)
   const [hrRest, setHrRest] = useState(50)
@@ -216,19 +217,26 @@ function VyriaTrainingPlan({ athleteData, userName }: VyriaTrainingPlanProps) {
   const [powerZones, setPowerZones] = useState<PowerZoneData | null>(null)
   const [zonesCalculated, setZonesCalculated] = useState(false)
 
-  // State - Weekly Plan
+  // Weekly Plan State
   const [generatedPlan, setGeneratedPlan] = useState<TrainingSession[]>([])
   const [selectedDay, setSelectedDay] = useState(0)
-  const [selectedSport, setSelectedSport] = useState("cycling")
-  const [selectedWorkoutType, setSelectedWorkoutType] = useState("endurance")
 
-  // State - Dialogs
+  // Dialog State
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [sessionToDelete, setSessionToDelete] = useState<string | null>(null)
   const [resetWeekDialogOpen, setResetWeekDialogOpen] = useState(false)
+  // Removed showWorkoutBuilder state
+  // const [showWorkoutBuilder, setShowWorkoutBuilder] = useState(false)
+
+  const [showInlineEditor, setShowInlineEditor] = useState(false)
+  const [editorSport, setEditorSport] = useState("cycling")
+  const [editorTitle, setEditorTitle] = useState("")
+  const [editorNotes, setEditorNotes] = useState("")
+  const [editorBlocks, setEditorBlocks] = useState<WorkoutBlock[]>([])
+  const [editorZoneType, setEditorZoneType] = useState<"hr" | "power">("power")
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // LOAD DATA ON MOUNT
+  // LOAD DATA
   // ═══════════════════════════════════════════════════════════════════════════
 
   useEffect(() => {
@@ -240,31 +248,24 @@ function VyriaTrainingPlan({ athleteData, userName }: VyriaTrainingPlanProps) {
         if (currentProfile.hr_lt2) setHrThreshold(currentProfile.hr_lt2)
         if (currentProfile.hr_rest) setHrRest(currentProfile.hr_rest)
         if (currentProfile.ftp_watts) setFtpWatts(currentProfile.ftp_watts)
-
-        // Load saved zones
         if (currentProfile.empathy_zones) {
           const zones = currentProfile.empathy_zones as { hr?: { zones: HRZoneData }; power?: { zones: PowerZoneData } }
           if (zones.hr?.zones) {
             setHrZones(zones.hr.zones)
             setZonesCalculated(true)
           }
-          if (zones.power?.zones) {
-            setPowerZones(zones.power.zones)
-          }
+          if (zones.power?.zones) setPowerZones(zones.power.zones)
         }
       }
     }
   }, [athleteData])
 
-  // Load existing workouts for current week
   useEffect(() => {
     const loadWeeklyWorkouts = async () => {
       if (!athleteData?.id) return
-
       setLoading(true)
       try {
         const { monday, sunday } = getWeekDateRange()
-
         const { data: workouts, error } = await supabase
           .from("training_activities")
           .select("*")
@@ -274,16 +275,14 @@ function VyriaTrainingPlan({ athleteData, userName }: VyriaTrainingPlanProps) {
           .order("activity_date", { ascending: true })
 
         if (error) throw error
-
         if (workouts && workouts.length > 0) {
           const sessions: TrainingSession[] = workouts.map((w: any) => {
             const activityDate = new Date(w.activity_date)
             const dayOfWeek = activityDate.getDay()
             const dayIndex = dayOfWeek === 0 ? 6 : dayOfWeek - 1
-
             return {
               sessionId: w.id || generateId(),
-              dayIndex,
+              dayIndex, // Correctly mapped to dayIndex
               sport: w.activity_type || w.workout_type || "cycling",
               workoutType: w.workout_type || "endurance",
               title: w.title || "Allenamento",
@@ -293,6 +292,7 @@ function VyriaTrainingPlan({ athleteData, userName }: VyriaTrainingPlanProps) {
               blocks: w.intervals?.blocks || [],
               tss: w.tss,
               gymExercises: w.gym_exercises || [],
+              completed: w.completed,
             }
           })
           setGeneratedPlan(sessions)
@@ -303,16 +303,14 @@ function VyriaTrainingPlan({ athleteData, userName }: VyriaTrainingPlanProps) {
         setLoading(false)
       }
     }
-
     loadWeeklyWorkouts()
   }, [athleteData?.id, supabase])
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // ZONE CALCULATIONS
+  // ZONE FUNCTIONS
   // ═══════════════════════════════════════════════════════════════════════════
 
   const calculateZones = () => {
-    // HR Zones (5-zone model based on LTHR)
     const calculatedHRZones: HRZoneData = {
       z1: { name: "Recupero", min: hrRest, max: Math.round(hrThreshold * 0.81), percent: { min: 0, max: 81 } },
       z2: {
@@ -335,8 +333,6 @@ function VyriaTrainingPlan({ athleteData, userName }: VyriaTrainingPlanProps) {
       },
       z5: { name: "VO2max", min: Math.round(hrThreshold * 1.0), max: hrMax, percent: { min: 100, max: 106 } },
     }
-
-    // Power Zones (7-zone Coggan model)
     const calculatedPowerZones: PowerZoneData = {
       z1: { name: "Recupero", min: 0, max: Math.round(ftpWatts * 0.55), percent: { min: 0, max: 55 } },
       z2: {
@@ -371,7 +367,6 @@ function VyriaTrainingPlan({ athleteData, userName }: VyriaTrainingPlanProps) {
       },
       z7: { name: "Neuromuscolare", min: Math.round(ftpWatts * 1.5), max: 9999, percent: { min: 150, max: 999 } },
     }
-
     setHrZones(calculatedHRZones)
     setPowerZones(calculatedPowerZones)
     setZonesCalculated(true)
@@ -379,7 +374,6 @@ function VyriaTrainingPlan({ athleteData, userName }: VyriaTrainingPlanProps) {
 
   const saveZones = async () => {
     if (!athleteData?.id || !athleteData.metabolic_profiles?.[0]?.id) return
-
     setSaving(true)
     try {
       const profileId = athleteData.metabolic_profiles[0].id
@@ -387,7 +381,6 @@ function VyriaTrainingPlan({ athleteData, userName }: VyriaTrainingPlanProps) {
         hr: { hr_max: hrMax, hr_threshold: hrThreshold, hr_rest: hrRest, zones: hrZones },
         power: { ftp_watts: ftpWatts, zones: powerZones },
       }
-
       const { error } = await supabase
         .from("metabolic_profiles")
         .update({
@@ -399,7 +392,6 @@ function VyriaTrainingPlan({ athleteData, userName }: VyriaTrainingPlanProps) {
           updated_at: new Date().toISOString(),
         })
         .eq("id", profileId)
-
       if (error) throw error
       alert("Zone salvate con successo!")
     } catch (err) {
@@ -411,26 +403,24 @@ function VyriaTrainingPlan({ athleteData, userName }: VyriaTrainingPlanProps) {
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // WORKOUT MANAGEMENT
+  // WORKOUT FUNCTIONS
   // ═══════════════════════════════════════════════════════════════════════════
 
   const addWorkoutToDay = (dayIndex: number, workout?: Partial<TrainingSession>) => {
     const newSession: TrainingSession = {
       sessionId: generateId(),
-      dayIndex,
-      sport: workout?.sport || selectedSport,
-      workoutType: workout?.workoutType || selectedWorkoutType,
-      title:
-        workout?.title ||
-        `${SPORTS.find((s) => s.id === selectedSport)?.name || "Allenamento"} - ${WORKOUT_TYPES.find((w) => w.id === selectedWorkoutType)?.name || ""}`,
+      dayIndex, // Correctly mapped to dayIndex
+      sport: workout?.sport || "cycling",
+      workoutType: workout?.workoutType || "endurance",
+      title: workout?.title || "Allenamento",
       description: workout?.description || "",
       duration: workout?.duration || 60,
-      targetZone: workout?.targetZone || WORKOUT_TYPES.find((w) => w.id === selectedWorkoutType)?.zone || "Z2",
+      targetZone: workout?.targetZone || "Z2",
       blocks: workout?.blocks || [],
       tss: workout?.tss,
       gymExercises: workout?.gymExercises,
+      completed: false,
     }
-
     setGeneratedPlan((prev) => [...prev, newSession])
   }
 
@@ -447,25 +437,19 @@ function VyriaTrainingPlan({ athleteData, userName }: VyriaTrainingPlanProps) {
 
   const saveWeekToTraining = async () => {
     if (!athleteData?.id || generatedPlan.length === 0) return
-
     setSaving(true)
     try {
-      const { monday } = getWeekDateRange()
-
-      // Delete existing workouts for this week
-      const { monday: weekStart, sunday: weekEnd } = getWeekDateRange()
+      const { monday, sunday } = getWeekDateRange()
       await supabase
         .from("training_activities")
         .delete()
         .eq("athlete_id", athleteData.id)
-        .gte("activity_date", weekStart.toISOString().split("T")[0])
-        .lte("activity_date", weekEnd.toISOString().split("T")[0])
+        .gte("activity_date", monday.toISOString().split("T")[0])
+        .lte("activity_date", sunday.toISOString().split("T")[0])
 
-      // Insert new workouts
       const workoutsToInsert = generatedPlan.map((session) => {
         const activityDate = new Date(monday)
-        activityDate.setDate(monday.getDate() + session.dayIndex)
-
+        activityDate.setDate(monday.getDate() + session.dayIndex) // Use dayIndex here
         return {
           athlete_id: athleteData.id,
           activity_date: activityDate.toISOString().split("T")[0],
@@ -474,20 +458,19 @@ function VyriaTrainingPlan({ athleteData, userName }: VyriaTrainingPlanProps) {
           title: session.title,
           description: session.description,
           duration_minutes: session.duration,
-          target_zone: session.targetZone,
+          targetZone: session.targetZone,
           tss: session.tss || Math.round(session.duration * 0.8),
           intervals: { blocks: session.blocks },
           gym_exercises: session.gymExercises,
           planned: true,
-          completed: false,
+          completed: session.completed,
           source: "vyria_generated",
         }
       })
-
       const { error } = await supabase.from("training_activities").insert(workoutsToInsert)
       if (error) throw error
-
       alert("Piano settimanale salvato!")
+      onUpdate?.()
     } catch (err) {
       console.error("Error saving week:", err)
       alert("Errore nel salvataggio")
@@ -507,33 +490,142 @@ function VyriaTrainingPlan({ athleteData, userName }: VyriaTrainingPlanProps) {
       duration: workout.estimatedTime || 60,
       targetZone: "GYM",
       blocks: [],
-      gymExercises: workout.exercises.map((ex: any) => ({
-        name: ex.exercise.name,
-        sets: ex.sets,
-        reps: ex.reps,
-        weight: ex.weight,
-        rest: ex.rest,
-        notes: ex.notes,
-      })),
+      gymExercises:
+        workout.exercises?.map((ex: any) => ({
+          name: ex.exercise?.name || ex.name,
+          sets: ex.sets,
+          reps: ex.reps,
+          weight: ex.weight,
+          rest: ex.rest,
+          notes: ex.notes,
+        })) || [],
+      completed: false,
     }
     setGeneratedPlan((prev) => [...prev, newSession])
   }
 
+  // Removed handleAdvancedWorkoutSave function
+  // const handleAdvancedWorkoutSave = (workout: GeneratedWorkout, dayIndex: number) => {
+  //   const newSession: TrainingSession = {
+  //     sessionId: generateId(),
+  //     dayIndex,
+  //     sport: workout.sport,
+  //     workoutType: workout.zoneType === "power" ? "power" : "hr",
+  //     title: workout.name,
+  //     description: workout.notes,
+  //     duration: workout.totalDuration,
+  //     targetZone: workout.blocks[0]?.primaryZone || "Z2",
+  //     blocks: workout.blocks.map((b) => ({
+  //       id: b.id,
+  //       type: b.blockType,
+  //       zone: b.primaryZone,
+  //       duration: b.totalDuration,
+  //       intervalDuration: b.intervalDuration,
+  //       intervalDurationUnit: b.durationUnit,
+  //       numIntervals: b.numIntervals,
+  //       restBetweenIntervals: b.restBetweenIntervals,
+  //     })),
+  //     tss: workout.estimatedTSS,
+  //     completed: false,
+  //   }
+  //   setGeneratedPlan((prev) => [...prev, newSession])
+  //   setShowWorkoutBuilder(false)
+  // }
+
+  const addBlock = (blockType: (typeof BLOCK_TYPES)[0]) => {
+    const newBlock: WorkoutBlock = {
+      id: generateId(),
+      type: blockType.id,
+      duration: blockType.defaultDuration,
+      zone: blockType.defaultZone,
+      intervalDuration: blockType.hasIntervals ? 3 : undefined,
+      intervalDurationUnit: "min",
+      numIntervals: blockType.hasIntervals ? 4 : undefined,
+      restBetweenIntervals: blockType.hasIntervals ? 2 : undefined,
+    }
+    setEditorBlocks((prev) => [...prev, newBlock])
+  }
+
+  const updateBlock = (blockId: string, updates: Partial<WorkoutBlock>) => {
+    setEditorBlocks((prev) => prev.map((b) => (b.id === blockId ? { ...b, ...updates } : b)))
+  }
+
+  const removeBlock = (blockId: string) => {
+    setEditorBlocks((prev) => prev.filter((b) => b.id !== blockId))
+  }
+
+  const moveBlock = (blockId: string, direction: "up" | "down") => {
+    setEditorBlocks((prev) => {
+      const idx = prev.findIndex((b) => b.id === blockId)
+      if (idx === -1) return prev
+      if (direction === "up" && idx === 0) return prev
+      if (direction === "down" && idx === prev.length - 1) return prev
+      const newBlocks = [...prev]
+      const swapIdx = direction === "up" ? idx - 1 : idx + 1
+      ;[newBlocks[idx], newBlocks[swapIdx]] = [newBlocks[swapIdx], newBlocks[idx]]
+      return newBlocks
+    })
+  }
+
+  const calculateBlockDuration = (block: WorkoutBlock): number => {
+    if (block.numIntervals && block.intervalDuration && block.restBetweenIntervals !== undefined) {
+      const intervalSec = block.intervalDurationUnit === "sec" ? block.intervalDuration : block.intervalDuration * 60
+      const totalWorkSec = intervalSec * block.numIntervals
+      const totalRestSec = block.restBetweenIntervals * 60 * (block.numIntervals - 1)
+      return Math.ceil((totalWorkSec + totalRestSec) / 60)
+    }
+    return block.duration
+  }
+
+  const getTotalDuration = () => editorBlocks.reduce((sum, b) => sum + calculateBlockDuration(b), 0)
+
+  const resetEditor = () => {
+    setEditorTitle("")
+    setEditorNotes("")
+    setEditorBlocks([])
+    setShowInlineEditor(false)
+  }
+
+  const saveEditorWorkout = () => {
+    if (editorBlocks.length === 0) {
+      alert("Aggiungi almeno un blocco")
+      return
+    }
+    const totalDuration = getTotalDuration()
+    const mainZone = editorBlocks.find((b) => b.type !== "warmup" && b.type !== "cooldown")?.zone || "Z2"
+
+    const newSession: TrainingSession = {
+      sessionId: generateId(),
+      dayIndex: selectedDay,
+      sport: editorSport,
+      workoutType: editorBlocks.some((b) => b.type === "intervals")
+        ? "intervals"
+        : editorBlocks[0]?.type || "endurance",
+      title: editorTitle || `Allenamento ${DAY_NAMES[selectedDay]}`,
+      description: editorNotes,
+      duration: totalDuration,
+      targetZone: mainZone,
+      blocks: editorBlocks,
+      tss: Math.round(totalDuration * (mainZone === "Z5" ? 1.2 : mainZone === "Z4" ? 1.0 : 0.7)),
+      completed: false,
+    }
+    setGeneratedPlan((prev) => [...prev, newSession])
+    resetEditor()
+  }
+
   // ═══════════════════════════════════════════════════════════════════════════
-  // RENDER - ZONE DISPLAY
+  // RENDER ZONE BAR
   // ═══════════════════════════════════════════════════════════════════════════
 
   const renderZoneBar = (zones: HRZoneData | PowerZoneData | null, type: "hr" | "power") => {
     if (!zones) return null
     const zoneKeys = Object.keys(zones) as (keyof typeof zones)[]
-
     return (
       <div className="space-y-2">
         {zoneKeys.map((key, idx) => {
           const zone = zones[key]
           const zoneNum = idx + 1
           const color = ZONE_COLORS[`Z${zoneNum}`] || "bg-gray-500"
-
           return (
             <div key={key} className="flex items-center gap-3">
               <div
@@ -563,7 +655,7 @@ function VyriaTrainingPlan({ athleteData, userName }: VyriaTrainingPlanProps) {
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // RENDER - WEEKLY CALENDAR
+  // RENDER WEEKLY CALENDAR
   // ═══════════════════════════════════════════════════════════════════════════
 
   const renderWeeklyCalendar = () => {
@@ -573,7 +665,7 @@ function VyriaTrainingPlan({ athleteData, userName }: VyriaTrainingPlanProps) {
     return (
       <div className="grid grid-cols-7 gap-2">
         {DAY_NAMES.map((day, idx) => {
-          const daySessions = generatedPlan.filter((s) => s.dayIndex === idx)
+          const daySessions = generatedPlan.filter((s) => s.dayIndex === idx) // Filter by dayIndex
           const isToday = idx === todayIndex
           const isSelected = idx === selectedDay
 
@@ -599,26 +691,24 @@ function VyriaTrainingPlan({ athleteData, userName }: VyriaTrainingPlanProps) {
                     {daySessions.map((session) => {
                       const SportIcon = SPORTS.find((s) => s.id === session.sport)?.icon || Activity
                       return (
-                        <div
-                          key={session.sessionId}
-                          className="flex items-center gap-1 text-[10px] p-1 rounded bg-muted/50 group"
-                        >
+                        <div key={session.sessionId} className="flex items-center justify-between group">
                           <div
-                            className={`w-4 h-4 rounded-full ${ZONE_COLORS[session.targetZone] || "bg-fuchsia-500"} flex items-center justify-center`}
+                            className={`w-6 h-6 rounded-full ${ZONE_COLORS[session.targetZone] || "bg-fuchsia-500"} flex items-center justify-center`}
                           >
-                            <SportIcon className="h-2 w-2 text-white" />
+                            <SportIcon className="h-3 w-3 text-white" />
                           </div>
-                          <span className="flex-1 truncate">{session.title.slice(0, 10)}</span>
-                          <button
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-5 w-5 opacity-0 group-hover:opacity-100 transition-opacity"
                             onClick={(e) => {
                               e.stopPropagation()
                               setSessionToDelete(session.sessionId)
                               setDeleteDialogOpen(true)
                             }}
-                            className="opacity-0 group-hover:opacity-100 transition-opacity"
                           >
                             <Trash2 className="h-3 w-3 text-red-500" />
-                          </button>
+                          </Button>
                         </div>
                       )
                     })}
@@ -634,13 +724,263 @@ function VyriaTrainingPlan({ athleteData, userName }: VyriaTrainingPlanProps) {
     )
   }
 
+  const renderInlineEditor = () => {
+    const blockType = (type: string) => BLOCK_TYPES.find((b) => b.id === type)
+
+    return (
+      <Card className="border-fuchsia-500/50 bg-fuchsia-500/5">
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Zap className="h-5 w-5 text-fuchsia-500" />
+              Crea Allenamento - {DAY_NAMES[selectedDay]}
+            </CardTitle>
+            <Button variant="ghost" size="icon" onClick={resetEditor}>
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+        </CardHeader>
+        <div className="max-h-[400px] overflow-y-auto px-6">
+          <div className="space-y-4 pb-4">
+            {/* Config Row */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <div>
+                <Label className="text-xs">Sport</Label>
+                <Select value={editorSport} onValueChange={setEditorSport}>
+                  <SelectTrigger className="h-9">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {SPORTS.filter((s) => s.id !== "gym").map((s) => (
+                      <SelectItem key={s.id} value={s.id}>
+                        <div className="flex items-center gap-2">
+                          <s.icon className="h-4 w-4" />
+                          {s.name}
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="text-xs">Zone Type</Label>
+                <Select value={editorZoneType} onValueChange={(v) => setEditorZoneType(v as "hr" | "power")}>
+                  <SelectTrigger className="h-9">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="power">Potenza (W)</SelectItem>
+                    <SelectItem value="hr">Frequenza (bpm)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="col-span-2">
+                <Label className="text-xs">Nome Allenamento</Label>
+                <Input
+                  value={editorTitle}
+                  onChange={(e) => setEditorTitle(e.target.value)}
+                  placeholder="es. Soglia 2x20"
+                  className="h-9"
+                />
+              </div>
+            </div>
+
+            {/* Block Type Buttons */}
+            <div>
+              <Label className="text-xs mb-2 block">Aggiungi Blocco</Label>
+              <div className="flex flex-wrap gap-2">
+                {BLOCK_TYPES.map((bt) => (
+                  <Button key={bt.id} variant="outline" size="sm" onClick={() => addBlock(bt)} className="h-8">
+                    <div className={`w-3 h-3 rounded-full ${bt.color} mr-2`} />
+                    {bt.name}
+                  </Button>
+                ))}
+              </div>
+            </div>
+
+            {/* Blocks List */}
+            {editorBlocks.length > 0 && (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs">
+                    Blocchi ({editorBlocks.length}) - Durata totale: {getTotalDuration()} min
+                  </Label>
+                </div>
+                <div className="space-y-2">
+                  {editorBlocks.map((block, idx) => {
+                    const bt = blockType(block.type)
+                    const hasIntervals = bt?.hasIntervals || block.numIntervals
+                    return (
+                      <div key={block.id} className="p-3 border rounded-lg bg-background">
+                        <div className="flex items-center gap-2 mb-2">
+                          <div className={`w-4 h-4 rounded ${bt?.color || "bg-gray-500"}`} />
+                          <span className="font-medium text-sm flex-1">{bt?.name || block.type}</span>
+                          <span className="text-xs text-muted-foreground">{calculateBlockDuration(block)} min</span>
+                          <div className="flex items-center gap-1">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6"
+                              onClick={() => moveBlock(block.id, "up")}
+                              disabled={idx === 0}
+                            >
+                              <ChevronUp className="h-3 w-3" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6"
+                              onClick={() => moveBlock(block.id, "down")}
+                              disabled={idx === editorBlocks.length - 1}
+                            >
+                              <ChevronDown className="h-3 w-3" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6 text-red-500"
+                              onClick={() => removeBlock(block.id)}
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                          {!hasIntervals && (
+                            <div>
+                              <Label className="text-[10px]">Durata (min)</Label>
+                              <Input
+                                type="number"
+                                value={block.duration}
+                                onChange={(e) =>
+                                  updateBlock(block.id, { duration: Number.parseInt(e.target.value) || 0 })
+                                }
+                                className="h-7 text-xs"
+                              />
+                            </div>
+                          )}
+                          <div>
+                            <Label className="text-[10px]">Zona</Label>
+                            <Select value={block.zone} onValueChange={(v) => updateBlock(block.id, { zone: v })}>
+                              <SelectTrigger className="h-7 text-xs">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {ZONES.map((z) => (
+                                  <SelectItem key={z} value={z}>
+                                    {z}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          {hasIntervals && (
+                            <>
+                              <div>
+                                <Label className="text-[10px]">Ripetute</Label>
+                                <Input
+                                  type="number"
+                                  value={block.numIntervals || 4}
+                                  onChange={(e) =>
+                                    updateBlock(block.id, { numIntervals: Number.parseInt(e.target.value) || 1 })
+                                  }
+                                  className="h-7 text-xs"
+                                />
+                              </div>
+                              <div>
+                                <Label className="text-[10px]">Durata</Label>
+                                <div className="flex gap-1">
+                                  <Input
+                                    type="number"
+                                    value={block.intervalDuration || 3}
+                                    onChange={(e) =>
+                                      updateBlock(block.id, { intervalDuration: Number.parseInt(e.target.value) || 1 })
+                                    }
+                                    className="h-7 text-xs w-14"
+                                  />
+                                  <Select
+                                    value={block.intervalDurationUnit || "min"}
+                                    onValueChange={(v) =>
+                                      updateBlock(block.id, { intervalDurationUnit: v as "min" | "sec" })
+                                    }
+                                  >
+                                    <SelectTrigger className="h-7 text-xs w-16">
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="min">min</SelectItem>
+                                      <SelectItem value="sec">sec</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                              </div>
+                              <div>
+                                <Label className="text-[10px]">Rec (min)</Label>
+                                <Input
+                                  type="number"
+                                  value={block.restBetweenIntervals || 2}
+                                  onChange={(e) =>
+                                    updateBlock(block.id, {
+                                      restBetweenIntervals: Number.parseInt(e.target.value) || 0,
+                                    })
+                                  }
+                                  className="h-7 text-xs"
+                                />
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Notes */}
+            <div>
+              <Label className="text-xs">Note</Label>
+              <Textarea
+                value={editorNotes}
+                onChange={(e) => setEditorNotes(e.target.value)}
+                placeholder="Note aggiuntive..."
+                className="h-16 text-sm"
+              />
+            </div>
+          </div>
+        </div>
+        <div className="border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 p-4">
+          <div className="flex gap-2 justify-between items-center">
+            <span className="text-sm text-muted-foreground">
+              {editorBlocks.length > 0
+                ? `${editorBlocks.length} blocchi - ${getTotalDuration()} min totali`
+                : "Nessun blocco"}
+            </span>
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={resetEditor}>
+                Annulla
+              </Button>
+              <Button
+                onClick={saveEditorWorkout}
+                className="bg-fuchsia-600 hover:bg-fuchsia-700"
+                disabled={editorBlocks.length === 0}
+              >
+                <Save className="h-4 w-4 mr-2" />
+                Salva Allenamento
+              </Button>
+            </div>
+          </div>
+        </div>
+      </Card>
+    )
+  }
+
   // ═══════════════════════════════════════════════════════════════════════════
   // MAIN RENDER
   // ═══════════════════════════════════════════════════════════════════════════
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h2 className="text-2xl font-bold flex items-center gap-2">
@@ -651,7 +991,6 @@ function VyriaTrainingPlan({ athleteData, userName }: VyriaTrainingPlanProps) {
         </div>
       </div>
 
-      {/* Main Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="grid w-full grid-cols-6">
           <TabsTrigger value="zones" className="flex items-center gap-1">
@@ -680,12 +1019,9 @@ function VyriaTrainingPlan({ athleteData, userName }: VyriaTrainingPlanProps) {
           </TabsTrigger>
         </TabsList>
 
-        {/* ═══════════════════════════════════════════════════════════════════ */}
         {/* TAB: ZONE */}
-        {/* ═══════════════════════════════════════════════════════════════════ */}
         <TabsContent value="zones" className="space-y-6 mt-6">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Input Parameters */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -710,7 +1046,6 @@ function VyriaTrainingPlan({ athleteData, userName }: VyriaTrainingPlanProps) {
                       className="mt-2"
                     />
                   </div>
-
                   <div>
                     <Label className="flex justify-between">
                       <span>FC Soglia (LTHR)</span>
@@ -725,7 +1060,6 @@ function VyriaTrainingPlan({ athleteData, userName }: VyriaTrainingPlanProps) {
                       className="mt-2"
                     />
                   </div>
-
                   <div>
                     <Label className="flex justify-between">
                       <span>FC Riposo</span>
@@ -740,7 +1074,6 @@ function VyriaTrainingPlan({ athleteData, userName }: VyriaTrainingPlanProps) {
                       className="mt-2"
                     />
                   </div>
-
                   <div className="pt-4 border-t">
                     <Label className="flex justify-between">
                       <span>FTP (Potenza Soglia)</span>
@@ -756,7 +1089,6 @@ function VyriaTrainingPlan({ athleteData, userName }: VyriaTrainingPlanProps) {
                     />
                   </div>
                 </div>
-
                 <div className="flex gap-2">
                   <Button onClick={calculateZones} className="flex-1 bg-fuchsia-600 hover:bg-fuchsia-700">
                     <RefreshCw className="mr-2 h-4 w-4" />
@@ -771,7 +1103,6 @@ function VyriaTrainingPlan({ athleteData, userName }: VyriaTrainingPlanProps) {
               </CardContent>
             </Card>
 
-            {/* Zone Display */}
             <div className="space-y-4">
               <Card>
                 <CardHeader className="pb-2">
@@ -788,7 +1119,6 @@ function VyriaTrainingPlan({ athleteData, userName }: VyriaTrainingPlanProps) {
                   )}
                 </CardContent>
               </Card>
-
               <Card>
                 <CardHeader className="pb-2">
                   <CardTitle className="text-sm flex items-center gap-2">
@@ -808,9 +1138,7 @@ function VyriaTrainingPlan({ athleteData, userName }: VyriaTrainingPlanProps) {
           </div>
         </TabsContent>
 
-        {/* ═══════════════════════════════════════════════════════════════════ */}
         {/* TAB: SETTIMANA */}
-        {/* ═══════════════════════════════════════════════════════════════════ */}
         <TabsContent value="weekly" className="space-y-6 mt-6">
           <Card>
             <CardHeader>
@@ -844,7 +1172,7 @@ function VyriaTrainingPlan({ athleteData, userName }: VyriaTrainingPlanProps) {
                 </div>
               </div>
             </CardHeader>
-            <CardContent>
+            <CardContent className="space-y-4">
               {loading ? (
                 <div className="flex items-center justify-center py-8">
                   <Loader2 className="h-8 w-8 animate-spin text-fuchsia-500" />
@@ -853,52 +1181,89 @@ function VyriaTrainingPlan({ athleteData, userName }: VyriaTrainingPlanProps) {
                 <>
                   {renderWeeklyCalendar()}
 
-                  {/* Quick Add */}
-                  <div className="mt-4 p-4 border rounded-lg bg-muted/30">
-                    <h4 className="font-medium mb-3">Aggiungi allenamento a {DAY_NAMES[selectedDay]}</h4>
-                    <div className="flex flex-wrap gap-2">
-                      <Select value={selectedSport} onValueChange={setSelectedSport}>
-                        <SelectTrigger className="w-[140px]">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {SPORTS.map((sport) => (
-                            <SelectItem key={sport.id} value={sport.id}>
-                              <div className="flex items-center gap-2">
-                                <sport.icon className="h-4 w-4" />
-                                {sport.name}
-                              </div>
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-
-                      <Select value={selectedWorkoutType} onValueChange={setSelectedWorkoutType}>
-                        <SelectTrigger className="w-[140px]">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {WORKOUT_TYPES.map((type) => (
-                            <SelectItem key={type.id} value={type.id}>
-                              <div className="flex items-center gap-2">
-                                <Badge className={`${ZONE_COLORS[type.zone]} text-white text-[10px]`}>
-                                  {type.zone}
-                                </Badge>
-                                {type.name}
-                              </div>
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-
-                      <Button
-                        onClick={() => addWorkoutToDay(selectedDay)}
-                        className="bg-fuchsia-600 hover:bg-fuchsia-700"
-                      >
-                        <Plus className="h-4 w-4 mr-1" />
-                        Aggiungi
-                      </Button>
-                    </div>
+                  {/* Quick Add / Editor Section */}
+                  <div className="border-t pt-4">
+                    {showInlineEditor ? (
+                      renderInlineEditor()
+                    ) : (
+                      <div className="space-y-3">
+                        <Label className="text-sm font-medium">Aggiungi a {DAY_NAMES[selectedDay]}</Label>
+                        <div className="flex flex-wrap gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() =>
+                              addWorkoutToDay(selectedDay, {
+                                sport: "cycling",
+                                workoutType: "endurance",
+                                title: "Endurance Z2",
+                                duration: 90,
+                                targetZone: "Z2",
+                              })
+                            }
+                          >
+                            <Bike className="h-4 w-4 mr-1" />
+                            Endurance
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() =>
+                              addWorkoutToDay(selectedDay, {
+                                sport: "cycling",
+                                workoutType: "threshold",
+                                title: "Soglia Z4",
+                                duration: 60,
+                                targetZone: "Z4",
+                              })
+                            }
+                          >
+                            <Target className="h-4 w-4 mr-1" />
+                            Soglia
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() =>
+                              addWorkoutToDay(selectedDay, {
+                                sport: "cycling",
+                                workoutType: "intervals",
+                                title: "Intervalli VO2",
+                                duration: 75,
+                                targetZone: "Z5",
+                              })
+                            }
+                          >
+                            <Zap className="h-4 w-4 mr-1" />
+                            Intervalli
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() =>
+                              addWorkoutToDay(selectedDay, {
+                                sport: "running",
+                                workoutType: "endurance",
+                                title: "Corsa Z2",
+                                duration: 45,
+                                targetZone: "Z2",
+                              })
+                            }
+                          >
+                            <Footprints className="h-4 w-4 mr-1" />
+                            Corsa
+                          </Button>
+                          <Button
+                            size="sm"
+                            onClick={() => setShowInlineEditor(true)}
+                            className="bg-fuchsia-600 hover:bg-fuchsia-700"
+                          >
+                            <Plus className="h-4 w-4 mr-1" />
+                            Crea Personalizzato
+                          </Button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </>
               )}
@@ -906,9 +1271,7 @@ function VyriaTrainingPlan({ athleteData, userName }: VyriaTrainingPlanProps) {
           </Card>
         </TabsContent>
 
-        {/* ═══════════════════════════════════════════════════════════════════ */}
         {/* TAB: PALESTRA */}
-        {/* ═══════════════════════════════════════════════════════════════════ */}
         <TabsContent value="gym" className="space-y-6 mt-6">
           <GymExerciseLibrary
             onSaveWorkout={handleGymWorkoutSave}
@@ -918,9 +1281,7 @@ function VyriaTrainingPlan({ athleteData, userName }: VyriaTrainingPlanProps) {
           />
         </TabsContent>
 
-        {/* ═══════════════════════════════════════════════════════════════════ */}
         {/* TAB: BIBLIOTECA */}
-        {/* ═══════════════════════════════════════════════════════════════════ */}
         <TabsContent value="library" className="space-y-6 mt-6">
           <WorkoutLibrary
             athleteId={athleteData?.id || ""}
@@ -938,25 +1299,21 @@ function VyriaTrainingPlan({ athleteData, userName }: VyriaTrainingPlanProps) {
                 })
               }
             }}
+            selectedDay={selectedDay}
+            dayNames={DAY_NAMES}
           />
         </TabsContent>
 
-        {/* ═══════════════════════════════════════════════════════════════════ */}
         {/* TAB: PIANO ANNUALE */}
-        {/* ═══════════════════════════════════════════════════════════════════ */}
         <TabsContent value="annual" className="space-y-6 mt-6">
           <AnnualPlanGenerator
             athleteData={athleteData}
             userName={userName}
-            onPlanGenerated={(mesocycles) => {
-              console.log("Plan generated:", mesocycles)
-            }}
+            onPlanGenerated={(mesocycles) => console.log("Plan generated:", mesocycles)}
           />
         </TabsContent>
 
-        {/* ═══════════════════════════════════════════════════════════════════ */}
         {/* TAB: IMPOSTAZIONI */}
-        {/* ═══════════════════════════════════════════════════════════════════ */}
         <TabsContent value="settings" className="space-y-6 mt-6">
           <Card>
             <CardHeader>
@@ -990,7 +1347,7 @@ function VyriaTrainingPlan({ athleteData, userName }: VyriaTrainingPlanProps) {
         </TabsContent>
       </Tabs>
 
-      {/* Delete Session Dialog */}
+      {/* Delete Dialog */}
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -1024,6 +1381,16 @@ function VyriaTrainingPlan({ athleteData, userName }: VyriaTrainingPlanProps) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Removed AdvancedWorkoutBuilder component rendering */}
+      {/* <AdvancedWorkoutBuilder
+        open={showWorkoutBuilder}
+        onClose={() => setShowWorkoutBuilder(false)}
+        onSave={handleAdvancedWorkoutSave}
+        dayIndex={selectedDay}
+        dayName={DAY_NAMES[selectedDay]}
+        athleteWeight={athleteData?.weight_kg || 70}
+      /> */}
     </div>
   )
 }
