@@ -2262,3 +2262,4 @@ export function AnnualPlanGenerator({ athleteData, userName, onPlanGenerated }: 
     </div>
   )
 }
+
