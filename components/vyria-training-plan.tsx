@@ -29,13 +29,10 @@ import {
   Save,
   RefreshCw,
   Loader2,
-  Plus,
   Trash2,
-  RotateCcw,
   CalendarRange,
   Target,
   Zap,
-  Calendar,
   Heart,
   BookOpen,
   Settings,
@@ -46,7 +43,7 @@ import {
 import { createClient } from "@/lib/supabase/client"
 import { AnnualPlanGenerator } from "./annual-plan-generator"
 import { WorkoutLibrary } from "./workout-library"
-import { GymExerciseLibrary } from "./gym-exercise-library"
+import GymExerciseLibrary from "./gym-exercise-library"
 
 // ═══════════════════════════════════════════════════════════════════════════
 // INTERFACES
@@ -235,6 +232,17 @@ function VyriaTrainingPlan({ athleteData, userName, onUpdate }: VyriaTrainingPla
   const [editorBlocks, setEditorBlocks] = useState<WorkoutBlock[]>([])
   const [editorZoneType, setEditorZoneType] = useState<"hr" | "power">("power")
 
+  // State - add training preferences state after existing state declarations
+  const [trainingPreferences, setTrainingPreferences] = useState<{
+    restDays: number[]
+    preferredTime: string
+    coachNotes: string
+  }>({
+    restDays: [],
+    preferredTime: "morning",
+    coachNotes: "",
+  })
+
   // ═══════════════════════════════════════════════════════════════════════════
   // LOAD DATA
   // ═══════════════════════════════════════════════════════════════════════════
@@ -259,6 +267,91 @@ function VyriaTrainingPlan({ athleteData, userName, onUpdate }: VyriaTrainingPla
       }
     }
   }, [athleteData])
+
+  useEffect(() => {
+    const loadTrainingPreferences = async () => {
+      if (!athleteData?.id) return
+
+      try {
+        // First try to load from annual_training_plans
+        const { data: planData } = await supabase
+          .from("annual_training_plans")
+          .select("config_json")
+          .eq("athlete_id", athleteData.id)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .single()
+
+        if (planData?.config_json?.training_preferences) {
+          const prefs = planData.config_json.training_preferences
+          // Convert day names to indices (Mon=0, Tue=1, etc.)
+          const dayNameToIndex: Record<string, number> = {
+            Mon: 0,
+            Tue: 1,
+            Wed: 2,
+            Thu: 3,
+            Fri: 4,
+            Sat: 5,
+            Sun: 6,
+          }
+          const restDayIndices = (prefs.preferred_rest_days || [])
+            .map((d: string) => dayNameToIndex[d])
+            .filter((i: number | undefined) => i !== undefined)
+
+          setTrainingPreferences({
+            restDays: restDayIndices,
+            preferredTime: prefs.preferred_training_time || "morning",
+            coachNotes: prefs.coach_notes || "",
+          })
+          console.log("[v0] Loaded training preferences from annual plan:", prefs)
+          return
+        }
+
+        // Fallback: load from athlete_constraints.notes
+        const { data: constraintsData } = await supabase
+          .from("athlete_constraints")
+          .select("notes")
+          .eq("athlete_id", athleteData.id)
+          .single()
+
+        if (constraintsData?.notes) {
+          try {
+            const notes =
+              typeof constraintsData.notes === "string" ? JSON.parse(constraintsData.notes) : constraintsData.notes
+
+            if (notes.training_preferences) {
+              const prefs = notes.training_preferences
+              const dayNameToIndex: Record<string, number> = {
+                Mon: 0,
+                Tue: 1,
+                Wed: 2,
+                Thu: 3,
+                Fri: 4,
+                Sat: 5,
+                Sun: 6,
+              }
+              const restDayIndices = (prefs.preferred_rest_days || [])
+                .map((d: string) => dayNameToIndex[d])
+                .filter((i: number | undefined) => i !== undefined)
+
+              setTrainingPreferences({
+                restDays: restDayIndices,
+                preferredTime: prefs.preferred_training_time || "morning",
+                coachNotes: prefs.coach_notes || "",
+              })
+              console.log("[v0] Loaded training preferences from constraints:", prefs)
+            }
+          } catch (e) {
+            console.error("[v0] Error parsing training preferences:", e)
+          }
+        }
+      } catch (error) {
+        console.error("[v0] Error loading training preferences:", error)
+      }
+    }
+
+    loadTrainingPreferences()
+  }, [athleteData?.id, supabase])
 
   useEffect(() => {
     const loadWeeklyWorkouts = async () => {
@@ -479,29 +572,84 @@ function VyriaTrainingPlan({ athleteData, userName, onUpdate }: VyriaTrainingPla
     }
   }
 
-  const handleGymWorkoutSave = (workout: any) => {
-    const newSession: TrainingSession = {
-      sessionId: generateId(),
-      dayIndex: selectedDay,
-      sport: "gym",
-      workoutType: "strength",
+  const handleGymWorkoutSave = async (workout: any) => {
+    if (!athleteData?.id) {
+      console.log("[v0] handleGymWorkoutSave: No athleteData.id, cannot save")
+      alert("Errore: dati atleta non disponibili")
+      return
+    }
+
+    console.log("[v0] handleGymWorkoutSave called with:", workout)
+
+    // Calcola la data per il giorno selezionato
+    const today = new Date()
+    const dayOfWeek = today.getDay()
+    const monday = new Date(today)
+    monday.setDate(today.getDate() - ((dayOfWeek + 7) % 7)) // Correctly calculate Monday of the current week
+    const activityDate = new Date(monday)
+    activityDate.setDate(monday.getDate() + selectedDay)
+
+    const gymExercises =
+      workout.exercises?.map((ex: any) => ({
+        name: ex.exercise?.name || ex.name,
+        sets: ex.sets,
+        reps: ex.reps,
+        weight: ex.weight,
+        rest: ex.rest,
+        notes: ex.notes,
+      })) || []
+
+    const workoutData = {
+      athlete_id: athleteData.id,
+      activity_date: activityDate.toISOString().split("T")[0],
+      activity_type: "gym",
+      workout_type: "strength",
       title: workout.name || "Scheda Palestra",
       description: workout.notes || "",
-      duration: workout.estimatedTime || 60,
-      targetZone: "GYM",
-      blocks: [],
-      gymExercises:
-        workout.exercises?.map((ex: any) => ({
-          name: ex.exercise?.name || ex.name,
-          sets: ex.sets,
-          reps: ex.reps,
-          weight: ex.weight,
-          rest: ex.rest,
-          notes: ex.notes,
-        })) || [],
+      duration_minutes: workout.estimatedTime || 60,
+      target_zone: "GYM",
+      intervals: { gymExercises }, // Assuming 'intervals' is the correct field for gym exercises in the DB schema
+      planned: true,
       completed: false,
+      source: "vyria_gym",
     }
-    setGeneratedPlan((prev) => [...prev, newSession])
+
+    console.log("[v0] Saving gym workout to database:", workoutData)
+
+    try {
+      const { data, error } = await supabase.from("training_activities").insert(workoutData).select()
+
+      if (error) {
+        console.error("[v0] Error saving gym workout:", error)
+        alert("Errore nel salvataggio: " + error.message)
+        return
+      }
+
+      console.log("[v0] Gym workout saved successfully:", data)
+      alert("Scheda palestra salvata in Training!")
+
+      // Aggiorna anche lo stato locale per feedback immediato
+      const newSession: TrainingSession = {
+        sessionId: generateId(),
+        dayIndex: selectedDay,
+        sport: "gym",
+        workoutType: "strength",
+        title: workout.name || "Scheda Palestra",
+        description: workout.notes || "",
+        duration: workout.estimatedTime || 60,
+        targetZone: "GYM",
+        blocks: [],
+        gymExercises,
+        completed: false,
+      }
+      setGeneratedPlan((prev) => [...prev, newSession])
+
+      // Notifica il parent component per aggiornare la vista
+      onUpdate?.()
+    } catch (err) {
+      console.error("[v0] Exception saving gym workout:", err)
+      alert("Errore nel salvataggio")
+    }
   }
 
   // Removed handleAdvancedWorkoutSave function
@@ -665,14 +813,15 @@ function VyriaTrainingPlan({ athleteData, userName, onUpdate }: VyriaTrainingPla
     return (
       <div className="grid grid-cols-7 gap-2">
         {DAY_NAMES.map((day, idx) => {
-          const daySessions = generatedPlan.filter((s) => s.dayIndex === idx) // Filter by dayIndex
+          const daySessions = generatedPlan.filter((s) => s.dayIndex === idx)
           const isToday = idx === todayIndex
           const isSelected = idx === selectedDay
+          const isRestDay = trainingPreferences.restDays.includes(idx)
 
           return (
             <Card
               key={idx}
-              className={`cursor-pointer transition-all hover:shadow-md ${isToday ? "ring-2 ring-fuchsia-500" : ""} ${isSelected ? "bg-fuchsia-500/10 border-fuchsia-500" : ""}`}
+              className={`cursor-pointer transition-all hover:shadow-md ${isToday ? "ring-2 ring-fuchsia-500" : ""} ${isSelected ? "bg-fuchsia-500/10 border-fuchsia-500" : ""} ${isRestDay ? "bg-slate-100/50 dark:bg-slate-800/50 border-dashed border-muted" : ""}`}
               onClick={() => setSelectedDay(idx)}
             >
               <CardHeader className="p-2 pb-1">
@@ -683,6 +832,7 @@ function VyriaTrainingPlan({ athleteData, userName, onUpdate }: VyriaTrainingPla
                       {daySessions.length}
                     </Badge>
                   )}
+                  {isRestDay && !daySessions.length && <Activity className="h-3 w-3 text-gray-400" />}
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-2 pt-0 min-h-[80px]">
@@ -714,7 +864,9 @@ function VyriaTrainingPlan({ athleteData, userName, onUpdate }: VyriaTrainingPla
                     })}
                   </div>
                 ) : (
-                  <div className="text-[10px] text-muted-foreground text-center py-2">Riposo</div>
+                  <div className="text-[10px] text-muted-foreground text-center py-2">
+                    {isRestDay ? "Riposo" : "Riposo"}
+                  </div>
                 )}
               </CardContent>
             </Card>
@@ -763,7 +915,7 @@ function VyriaTrainingPlan({ athleteData, userName, onUpdate }: VyriaTrainingPla
                 </Select>
               </div>
               <div>
-                <Label className="text-xs">Zone Type</Label>
+                <Label className="text-xs">Zones Type</Label>
                 <Select value={editorZoneType} onValueChange={(v) => setEditorZoneType(v as "hr" | "power")}>
                   <SelectTrigger className="h-9">
                     <SelectValue />
@@ -992,14 +1144,12 @@ function VyriaTrainingPlan({ athleteData, userName, onUpdate }: VyriaTrainingPla
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-6">
+        {/* Rimuovo tab Settimana, VYRIA diventa: Zone, Palestra, Biblioteca, Piano Annuale, Impostazioni */}
+        {/* Cambio da 6 a 5 colonne e rimuovo TabsTrigger "weekly" */}
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="zones" className="flex items-center gap-1">
             <Heart className="h-4 w-4" />
             <span className="hidden sm:inline">Zone</span>
-          </TabsTrigger>
-          <TabsTrigger value="weekly" className="flex items-center gap-1">
-            <Calendar className="h-4 w-4" />
-            <span className="hidden sm:inline">Settimana</span>
           </TabsTrigger>
           <TabsTrigger value="gym" className="flex items-center gap-1">
             <Dumbbell className="h-4 w-4" />
@@ -1018,7 +1168,6 @@ function VyriaTrainingPlan({ athleteData, userName, onUpdate }: VyriaTrainingPla
             <span className="hidden sm:inline">Impostazioni</span>
           </TabsTrigger>
         </TabsList>
-
         {/* TAB: ZONE */}
         <TabsContent value="zones" className="space-y-6 mt-6">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -1137,140 +1286,6 @@ function VyriaTrainingPlan({ athleteData, userName, onUpdate }: VyriaTrainingPla
             </div>
           </div>
         </TabsContent>
-
-        {/* TAB: SETTIMANA */}
-        <TabsContent value="weekly" className="space-y-6 mt-6">
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="flex items-center gap-2">
-                    <Calendar className="h-5 w-5 text-fuchsia-500" />
-                    Piano Settimanale
-                  </CardTitle>
-                  <CardDescription>Settimana corrente - {generatedPlan.length} allenamenti</CardDescription>
-                </div>
-                <div className="flex gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setResetWeekDialogOpen(true)}
-                    disabled={generatedPlan.length === 0}
-                  >
-                    <RotateCcw className="h-4 w-4 mr-1" />
-                    Reset
-                  </Button>
-                  <Button
-                    size="sm"
-                    onClick={saveWeekToTraining}
-                    disabled={saving || generatedPlan.length === 0}
-                    className="bg-fuchsia-600 hover:bg-fuchsia-700"
-                  >
-                    {saving ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Save className="h-4 w-4 mr-1" />}
-                    Salva
-                  </Button>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {loading ? (
-                <div className="flex items-center justify-center py-8">
-                  <Loader2 className="h-8 w-8 animate-spin text-fuchsia-500" />
-                </div>
-              ) : (
-                <>
-                  {renderWeeklyCalendar()}
-
-                  {/* Quick Add / Editor Section */}
-                  <div className="border-t pt-4">
-                    {showInlineEditor ? (
-                      renderInlineEditor()
-                    ) : (
-                      <div className="space-y-3">
-                        <Label className="text-sm font-medium">Aggiungi a {DAY_NAMES[selectedDay]}</Label>
-                        <div className="flex flex-wrap gap-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() =>
-                              addWorkoutToDay(selectedDay, {
-                                sport: "cycling",
-                                workoutType: "endurance",
-                                title: "Endurance Z2",
-                                duration: 90,
-                                targetZone: "Z2",
-                              })
-                            }
-                          >
-                            <Bike className="h-4 w-4 mr-1" />
-                            Endurance
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() =>
-                              addWorkoutToDay(selectedDay, {
-                                sport: "cycling",
-                                workoutType: "threshold",
-                                title: "Soglia Z4",
-                                duration: 60,
-                                targetZone: "Z4",
-                              })
-                            }
-                          >
-                            <Target className="h-4 w-4 mr-1" />
-                            Soglia
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() =>
-                              addWorkoutToDay(selectedDay, {
-                                sport: "cycling",
-                                workoutType: "intervals",
-                                title: "Intervalli VO2",
-                                duration: 75,
-                                targetZone: "Z5",
-                              })
-                            }
-                          >
-                            <Zap className="h-4 w-4 mr-1" />
-                            Intervalli
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() =>
-                              addWorkoutToDay(selectedDay, {
-                                sport: "running",
-                                workoutType: "endurance",
-                                title: "Corsa Z2",
-                                duration: 45,
-                                targetZone: "Z2",
-                              })
-                            }
-                          >
-                            <Footprints className="h-4 w-4 mr-1" />
-                            Corsa
-                          </Button>
-                          <Button
-                            size="sm"
-                            onClick={() => setShowInlineEditor(true)}
-                            className="bg-fuchsia-600 hover:bg-fuchsia-700"
-                          >
-                            <Plus className="h-4 w-4 mr-1" />
-                            Crea Personalizzato
-                          </Button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
         {/* TAB: PALESTRA */}
         <TabsContent value="gym" className="space-y-6 mt-6">
           <GymExerciseLibrary
@@ -1280,7 +1295,6 @@ function VyriaTrainingPlan({ athleteData, userName, onUpdate }: VyriaTrainingPla
             dayNames={DAY_NAMES}
           />
         </TabsContent>
-
         {/* TAB: BIBLIOTECA */}
         <TabsContent value="library" className="space-y-6 mt-6">
           <WorkoutLibrary
@@ -1303,7 +1317,6 @@ function VyriaTrainingPlan({ athleteData, userName, onUpdate }: VyriaTrainingPla
             dayNames={DAY_NAMES}
           />
         </TabsContent>
-
         {/* TAB: PIANO ANNUALE */}
         <TabsContent value="annual" className="space-y-6 mt-6">
           <AnnualPlanGenerator
@@ -1312,7 +1325,6 @@ function VyriaTrainingPlan({ athleteData, userName, onUpdate }: VyriaTrainingPla
             onPlanGenerated={(mesocycles) => console.log("Plan generated:", mesocycles)}
           />
         </TabsContent>
-
         {/* TAB: IMPOSTAZIONI */}
         <TabsContent value="settings" className="space-y-6 mt-6">
           <Card>
@@ -1341,6 +1353,62 @@ function VyriaTrainingPlan({ athleteData, userName, onUpdate }: VyriaTrainingPla
                   </SelectContent>
                 </Select>
               </div>
+              <Label>Giorni di Riposo Preferiti</Label>
+              <div className="flex flex-wrap gap-2">
+                {DAY_NAMES.map((day, idx) => (
+                  <Button
+                    key={idx}
+                    variant={trainingPreferences.restDays.includes(idx) ? "default" : "outline"}
+                    size="sm"
+                    className={trainingPreferences.restDays.includes(idx) ? "bg-red-500 hover:bg-red-600" : ""}
+                    onClick={() => {
+                      setTrainingPreferences((prev) => {
+                        const restDays = prev.restDays.includes(idx)
+                          ? prev.restDays.filter((d) => d !== idx)
+                          : [...prev.restDays, idx]
+                        return { ...prev, restDays }
+                      })
+                    }}
+                  >
+                    {day.slice(0, 3)}
+                  </Button>
+                ))}
+              </div>
+              <div>
+                <Label>Orario Allenamento Preferito</Label>
+                <Select
+                  value={trainingPreferences.preferredTime}
+                  onValueChange={(v) => setTrainingPreferences({ ...trainingPreferences, preferredTime: v })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="morning">Mattina</SelectItem>
+                    <SelectItem value="afternoon">Pomeriggio</SelectItem>
+                    <SelectItem value="evening">Sera</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Note Allenatore</Label>
+                <Textarea
+                  value={trainingPreferences.coachNotes}
+                  onChange={(e) => setTrainingPreferences({ ...trainingPreferences, coachNotes: e.target.value })}
+                  placeholder="Note per l'atleta..."
+                  className="min-h-[100px]"
+                />
+              </div>
+              <Button
+                className="bg-fuchsia-600 hover:bg-fuchsia-700"
+                onClick={async () => {
+                  console.log("Saving training preferences:", trainingPreferences)
+                  alert("Salvataggio preferenze da implementare!")
+                }}
+              >
+                <Save className="mr-2 h-4 w-4" />
+                Salva Preferenze
+              </Button>
               <p className="text-sm text-muted-foreground">Altre impostazioni verranno aggiunte in futuro.</p>
             </CardContent>
           </Card>
