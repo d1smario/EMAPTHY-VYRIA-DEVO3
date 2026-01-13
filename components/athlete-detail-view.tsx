@@ -15,16 +15,18 @@ import {
   FileText,
   BarChart3,
   RefreshCw,
+  Zap,
 } from "lucide-react"
-import { getClient } from "@/lib/supabase/client"
+import { createClient } from "@/lib/supabase/client"
 import { AthleteProfile } from "@/components/athlete-profile"
 import { PerformanceAnalysis } from "@/components/performance-analysis"
 import { ActivityDashboard } from "@/components/activity-dashboard"
 import VyriaTrainingPlan from "@/components/vyria-training-plan"
-import { WeeklyTraining } from "@/components/weekly-training"
-import { NutritionPlan } from "@/components/nutrition-plan"
+import WeeklyTraining from "@/components/weekly-training"
+import NutritionPlan from "@/components/nutrition-plan"
 import { MicrobiomeEpigenetic } from "@/components/microbiome-epigenetic"
 import DailyTrainingReport from "@/components/daily-training-report"
+import { PowerZonesEditor } from "@/components/power-zones-editor"
 import type { AthleteDataType, WorkoutType } from "@/components/dashboard-content"
 
 interface AthleteDetailViewProps {
@@ -48,7 +50,7 @@ export function AthleteDetailView({ athleteUserId, athleteName, onBack }: Athlet
         setLoading(true)
       }
 
-      const supabase = getClient()
+      const supabase = createClient()
       if (!supabase) return
 
       try {
@@ -163,7 +165,7 @@ export function AthleteDetailView({ athleteUserId, athleteName, onBack }: Athlet
   const handleTabChange = (tab: string) => {
     setActiveTab(tab)
     // Refresh data when switching to tabs that depend on updated data
-    if (tab === "vyria" || tab === "training" || tab === "nutrition") {
+    if (tab === "vyria" || tab === "training" || tab === "nutrition" || tab === "zones") {
       loadAthleteData(true)
     }
   }
@@ -220,7 +222,7 @@ export function AthleteDetailView({ athleteUserId, athleteName, onBack }: Athlet
       {/* Athlete tabs - same as athlete dashboard */}
       <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
         <div className="overflow-x-auto pb-2">
-          <TabsList className="grid w-full grid-cols-8 lg:w-[1000px]">
+          <TabsList className="grid w-full grid-cols-9 lg:w-[1000px]">
             <TabsTrigger value="profile" className="flex items-center gap-2">
               <User className="h-4 w-4" />
               <span className="hidden sm:inline">Profilo</span>
@@ -252,6 +254,10 @@ export function AthleteDetailView({ athleteUserId, athleteName, onBack }: Athlet
             <TabsTrigger value="reports" className="flex items-center gap-2">
               <FileText className="h-4 w-4" />
               <span className="hidden sm:inline">Daily Log</span>
+            </TabsTrigger>
+            <TabsTrigger value="zones" className="flex items-center gap-1">
+              <Zap className="h-4 w-4" />
+              <span className="hidden sm:inline">Zone</span>
             </TabsTrigger>
           </TabsList>
         </div>
@@ -301,6 +307,18 @@ export function AthleteDetailView({ athleteUserId, athleteName, onBack }: Athlet
 
         <TabsContent value="reports" className="space-y-4 focus-visible:outline-none focus-visible:ring-0">
           <DailyTrainingReport athleteId={athleteData.id} athleteName={athleteName || undefined} />
+        </TabsContent>
+
+        <TabsContent value="zones">
+          {athleteData && (
+            <PowerZonesEditor
+              athleteId={athleteData.id}
+              athleteName={athleteName || undefined}
+              initialFTP={athleteData.metabolic_profiles?.[0]?.ftp_watts || undefined}
+              sport={athleteData.primary_sport || "cycling"}
+              onSave={() => loadAthleteData(true)}
+            />
+          )}
         </TabsContent>
       </Tabs>
     </div>
