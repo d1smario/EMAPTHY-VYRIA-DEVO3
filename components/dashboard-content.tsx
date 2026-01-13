@@ -20,8 +20,8 @@ import {
   Smartphone,
 } from "lucide-react"
 import { AthleteProfile } from "@/components/athlete-profile"
-import { WeeklyTraining } from "@/components/weekly-training"
-import { NutritionPlan } from "@/components/nutrition-plan"
+import WeeklyTraining from "@/components/weekly-training"
+import NutritionPlan from "@/components/nutrition-plan"
 import { BioMapReport } from "@/components/biomap-report"
 import { PerformanceAnalysis } from "@/components/performance-analysis"
 import { BioMapReportTemplate } from "@/components/biomap-report-template"
