@@ -9,6 +9,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Textarea } from "@/components/ui/textarea"
 import { Switch } from "@/components/ui/switch"
+import { format } from "date-fns"
+import { it } from "date-fns/locale"
 import {
   Bike,
   Dumbbell,
@@ -21,16 +23,17 @@ import {
   ChevronUp,
   ChevronDown,
   X,
-  Save,
   Footprints,
   Waves,
   Activity,
   Mountain,
   Heart,
   Zap,
+  Library,
 } from "lucide-react"
 import { WorkoutDetailModal } from "@/components/workout-detail-modal"
 import { createClient } from "@/lib/supabase/client"
+import GymExerciseLibrary from "./gym-exercise-library"
 import type { AthleteDataType, WorkoutType } from "@/components/dashboard-content"
 
 interface WeeklyTrainingProps {
@@ -142,7 +145,7 @@ const getWorkoutIcon = (type: string) => {
   return <Bike className="h-5 w-5" />
 }
 
-export function WeeklyTraining({ athleteData, userName, workouts }: WeeklyTrainingProps) {
+function WeeklyTraining({ athleteData, userName, workouts }: WeeklyTrainingProps) {
   const supabase = createClient()
   const [selectedWorkout, setSelectedWorkout] = useState<WorkoutType | null>(null)
   const [localWorkouts, setLocalWorkouts] = useState<WorkoutType[]>(workouts || [])
@@ -151,6 +154,8 @@ export function WeeklyTraining({ athleteData, userName, workouts }: WeeklyTraini
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingDayIndex, setEditingDayIndex] = useState<number | null>(null)
   const [editingWorkout, setEditingWorkout] = useState<WorkoutType | null>(null)
+  const [showGymDialog, setShowGymDialog] = useState(false)
+  const [selectedGymDay, setSelectedGymDay] = useState(0)
 
   // Form state
   const [workoutName, setWorkoutName] = useState("")
@@ -164,6 +169,10 @@ export function WeeklyTraining({ athleteData, userName, workouts }: WeeklyTraini
   const [hrZones, setHRZones] = useState<HRZones>({})
   const [ftpWatts, setFtpWatts] = useState(0)
   const [hrMax, setHrMax] = useState(0)
+
+  const [showSaveToLibraryDialog, setShowSaveToLibraryDialog] = useState(false)
+  const [libraryWorkoutName, setLibraryWorkoutName] = useState("")
+  const [libraryWorkoutTags, setLibraryWorkoutTags] = useState<string[]>([])
 
   useEffect(() => {
     if (athleteData?.metabolic_profiles?.[0]) {
@@ -229,6 +238,9 @@ export function WeeklyTraining({ athleteData, userName, workouts }: WeeklyTraini
   const weekDates = getWeekDates()
   const today = new Date()
   today.setHours(0, 0, 0, 0)
+
+  const weekStart = weekDates[0]
+  const weekEnd = weekDates[6]
 
   const getWorkoutsForDay = (date: Date) => {
     return localWorkouts.filter((w) => {
@@ -367,6 +379,24 @@ export function WeeklyTraining({ athleteData, userName, workouts }: WeeklyTraini
     }, 0)
   }, [workoutBlocks])
 
+  // Estimate TSS based on duration and average zone intensity
+  const estimatedTSS = useMemo(() => {
+    if (workoutBlocks.length === 0) return 0
+
+    // Calculate average intensity factor based on zones
+    const avgIntensityFactor =
+      workoutBlocks.reduce((total, block) => {
+        const zoneNum = Number.parseInt(block.zone.replace(/[^0-9]/g, "")) || 2
+        // Intensity factors by zone: Z1=0.55, Z2=0.75, Z3=0.90, Z4=1.0, Z5=1.15, Z6=1.2, Z7=1.3
+        const intensityFactors: Record<number, number> = { 1: 0.55, 2: 0.75, 3: 0.9, 4: 1.0, 5: 1.15, 6: 1.2, 7: 1.3 }
+        return total + (intensityFactors[zoneNum] || 0.75)
+      }, 0) / workoutBlocks.length
+
+    // TSS = (duration in hours) * (intensity factor^2) * 100
+    const durationHours = totalDuration / 60
+    return Math.round(durationHours * avgIntensityFactor * avgIntensityFactor * 100)
+  }, [workoutBlocks, totalDuration])
+
   // Save workout
   const handleSaveWorkout = async () => {
     if (!athleteData?.id || editingDayIndex === null) return
@@ -417,6 +447,107 @@ export function WeeklyTraining({ athleteData, userName, workouts }: WeeklyTraini
     }
   }
 
+  const handleSaveGymWorkout = async (gymData: any) => {
+    console.log("[v0] handleSaveGymWorkout called with:", gymData)
+    console.log("[v0] athleteData:", athleteData?.id)
+
+    if (!athleteData?.id) {
+      console.log("[v0] No athleteData.id, returning")
+      return
+    }
+
+    const targetDate = new Date()
+    const currentDay = targetDate.getDay()
+    const diff = selectedGymDay - (currentDay === 0 ? 6 : currentDay - 1)
+    targetDate.setDate(targetDate.getDate() + diff)
+
+    const workoutData = {
+      athlete_id: athleteData.id,
+      title: gymData.name || "Scheda Palestra",
+      activity_type: "gym",
+      workout_type: "strength",
+      description: `${gymData.exercises?.length || 0} esercizi`,
+      duration_planned: gymData.duration || 60,
+      target_zone: "GYM",
+      activity_date: targetDate.toISOString().split("T")[0],
+      intervals: {
+        blocks: [],
+        gymExercises: gymData.exercises,
+        estimatedCalories: gymData.estimatedCalories,
+      },
+      planned: true,
+      completed: false,
+    }
+
+    console.log("[v0] Saving to training_activities:", workoutData)
+
+    try {
+      const { data, error } = await supabase.from("training_activities").insert(workoutData).select().single()
+
+      console.log("[v0] Supabase response:", { data, error })
+
+      if (error) throw error
+
+      setLocalWorkouts((prev) => [
+        ...prev,
+        {
+          id: data.id,
+          title: data.title,
+          activity_type: data.activity_type,
+          workout_type: data.workout_type,
+          description: data.description,
+          duration_planned: data.duration_planned,
+          target_zone: data.target_zone,
+          activity_date: data.activity_date,
+          intervals: data.intervals,
+          tss_planned: 0,
+        },
+      ])
+
+      setShowGymDialog(false)
+      alert("Scheda palestra salvata!")
+    } catch (err) {
+      console.error("[v0] Errore salvataggio palestra:", err)
+      alert("Errore nel salvataggio")
+    }
+  }
+
+  const handleSaveToLibrary = async () => {
+    if (!libraryWorkoutName.trim()) {
+      alert("Inserisci un nome per l'allenamento")
+      return
+    }
+
+    try {
+      const { data: userData } = await supabase.auth.getUser()
+
+      const workoutData = {
+        name: libraryWorkoutName,
+        sport: workoutSport,
+        workout_type: workoutBlocks.length > 0 ? workoutBlocks[0].type : "endurance",
+        description: workoutDescription,
+        duration_minutes: Math.round(totalDuration),
+        tss_estimate: estimatedTSS,
+        intervals: { blocks: workoutBlocks },
+        tags: libraryWorkoutTags,
+        created_by: userData.user?.id,
+        is_public: false,
+      }
+
+      const { error } = await supabase.from("workout_library").insert(workoutData)
+
+      if (error) throw error
+
+      alert("Allenamento salvato in biblioteca!")
+      setShowSaveToLibraryDialog(false)
+      setLibraryWorkoutName("")
+      setLibraryWorkoutTags([])
+    } catch (error) {
+      console.error("Error saving to library:", error)
+      alert("Errore nel salvataggio in biblioteca")
+    }
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -424,18 +555,21 @@ export function WeeklyTraining({ athleteData, userName, workouts }: WeeklyTraini
         <div>
           <h2 className="text-2xl font-bold">Piano Settimanale</h2>
           <p className="text-muted-foreground">
-            {weekDates[0].toLocaleDateString("it-IT", { day: "numeric", month: "short" })} -{" "}
-            {weekDates[6].toLocaleDateString("it-IT", { day: "numeric", month: "short" })} - {userName}
+            {format(weekStart, "d MMM", { locale: it })} - {format(weekEnd, "d MMM", { locale: it })} - {userName}
           </p>
         </div>
-        <div className="flex gap-2 flex-wrap">
-          <Badge variant="outline">{formatDuration(weeklyStats.totalDuration)} totali</Badge>
-          <Badge variant="outline">{weeklyStats.totalTSS} TSS</Badge>
-          <Badge variant="outline">{weeklyStats.bikeSessions} bike</Badge>
-          <Badge variant="outline">{weeklyStats.gymSessions} palestra</Badge>
-          <Badge variant="outline" className="text-green-500 border-green-500">
-            {weeklyStats.completed}/{weeklyStats.total} completati
-          </Badge>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            onClick={() => {
+              setSelectedGymDay(new Date().getDay() === 0 ? 6 : new Date().getDay() - 1)
+              setShowGymDialog(true)
+            }}
+            className="flex items-center gap-2"
+          >
+            <Dumbbell className="h-4 w-4" />
+            Importa Palestra
+          </Button>
         </div>
       </div>
 
@@ -861,21 +995,87 @@ export function WeeklyTraining({ athleteData, userName, workouts }: WeeklyTraini
           </div>
 
           {/* Fixed Footer */}
-          <DialogFooter className="shrink-0 p-4 border-t bg-background">
-            <div className="flex items-center justify-between w-full">
-              <span className="text-sm text-muted-foreground">
-                {workoutBlocks.length} blocchi - {Math.round(totalDuration)} min totali
-              </span>
-              <div className="flex gap-2">
-                <Button variant="outline" onClick={() => setDialogOpen(false)}>
-                  Annulla
-                </Button>
-                <Button onClick={handleSaveWorkout} disabled={workoutBlocks.length === 0}>
-                  <Save className="h-4 w-4 mr-2" />
-                  Salva Allenamento
-                </Button>
-              </div>
+          <DialogFooter className="shrink-0 p-4 border-t bg-background flex gap-2">
+            <Button variant="outline" onClick={() => setDialogOpen(false)}>
+              Annulla
+            </Button>
+            <Button
+              variant="secondary"
+              onClick={() => {
+                setLibraryWorkoutName(workoutName)
+                setShowSaveToLibraryDialog(true)
+              }}
+            >
+              <Library className="h-4 w-4 mr-2" />
+              Salva in Biblioteca
+            </Button>
+            <Button onClick={handleSaveWorkout}>Salva Allenamento</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog Importa Palestra */}
+      <Dialog open={showGymDialog} onOpenChange={setShowGymDialog}>
+        <DialogContent className="max-w-6xl h-[90vh] flex flex-col p-0">
+          <DialogHeader className="p-6 pb-0">
+            <DialogTitle className="flex items-center gap-2">
+              <Dumbbell className="h-5 w-5 text-orange-500" />
+              Importa Scheda Palestra - {dayNames[selectedGymDay]}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="flex-1 overflow-hidden p-6 pt-4">
+            <GymExerciseLibrary
+              onSaveWorkout={handleSaveGymWorkout}
+              selectedDay={selectedGymDay}
+              onDayChange={setSelectedGymDay}
+              dayNames={dayNames}
+            />
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showSaveToLibraryDialog} onOpenChange={setShowSaveToLibraryDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Salva in Biblioteca</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label>Nome Template</Label>
+              <Input
+                value={libraryWorkoutName}
+                onChange={(e) => setLibraryWorkoutName(e.target.value)}
+                placeholder="Es: Fondo Lungo Z2"
+              />
             </div>
+            <div>
+              <Label>Tags (separati da virgola)</Label>
+              <Input
+                value={libraryWorkoutTags.join(", ")}
+                onChange={(e) =>
+                  setLibraryWorkoutTags(
+                    e.target.value
+                      .split(",")
+                      .map((t) => t.trim())
+                      .filter((t) => t),
+                  )
+                }
+                placeholder="Es: base, aerobico, lungo"
+              />
+            </div>
+            <div className="text-sm text-muted-foreground">
+              <p>
+                Durata: {Math.floor(totalDuration / 60)}h {totalDuration % 60}min
+              </p>
+              <p>TSS: ~{estimatedTSS}</p>
+              <p>Blocchi: {workoutBlocks.length}</p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowSaveToLibraryDialog(false)}>
+              Annulla
+            </Button>
+            <Button onClick={handleSaveToLibrary}>Salva</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -886,8 +1086,31 @@ export function WeeklyTraining({ athleteData, userName, workouts }: WeeklyTraini
           workout={selectedWorkout}
           isOpen={!!selectedWorkout}
           onClose={() => setSelectedWorkout(null)}
+          onEdit={() => {
+            // Find the day index for this workout
+            const workoutDate = selectedWorkout.activity_date ? new Date(selectedWorkout.activity_date) : null
+            if (workoutDate) {
+              const dayIndex = weekDates.findIndex((d) => d.toDateString() === workoutDate.toDateString())
+              if (dayIndex !== -1) {
+                setSelectedWorkout(null) // Close detail modal
+                handleEditWorkout(selectedWorkout, dayIndex) // Open edit dialog
+              }
+            }
+          }}
+          dayName={
+            selectedWorkout.activity_date
+              ? dayNames[
+                  weekDates.findIndex(
+                    (d) => d.toDateString() === new Date(selectedWorkout.activity_date!).toDateString(),
+                  )
+                ] || ""
+              : ""
+          }
+          athleteFTP={ftpWatts || 250}
         />
       )}
     </div>
   )
 }
+
+export default WeeklyTraining
