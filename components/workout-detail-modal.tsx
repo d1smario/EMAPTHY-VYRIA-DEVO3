@@ -3,7 +3,19 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Clock, Target, Flame, Zap, TrendingUp, Bike, Dumbbell, CalendarDays, CheckCircle2, Play } from "lucide-react"
+import {
+  Clock,
+  Target,
+  Flame,
+  Zap,
+  TrendingUp,
+  Bike,
+  Dumbbell,
+  CalendarDays,
+  CheckCircle2,
+  Play,
+  Pencil,
+} from "lucide-react"
 
 interface WorkoutBlock {
   type: "warmup" | "interval" | "steady" | "recovery" | "cooldown"
@@ -37,7 +49,8 @@ interface WorkoutDetailModalProps {
   workout: WorkoutData | null
   isOpen: boolean
   onClose: () => void
-  dayName: string
+  onEdit?: () => void
+  dayName?: string
   athleteFTP?: number
 }
 
@@ -135,7 +148,14 @@ const getWorkoutIcon = (type: string) => {
   }
 }
 
-export function WorkoutDetailModal({ workout, isOpen, onClose, dayName, athleteFTP = 300 }: WorkoutDetailModalProps) {
+export function WorkoutDetailModal({
+  workout,
+  isOpen,
+  onClose,
+  onEdit,
+  dayName,
+  athleteFTP = 300,
+}: WorkoutDetailModalProps) {
   if (!workout) return null
 
   // Generate default blocks if none exist
@@ -329,6 +349,16 @@ export function WorkoutDetailModal({ workout, isOpen, onClose, dayName, athleteF
             <Button variant="outline" onClick={onClose}>
               Chiudi
             </Button>
+            {onEdit && (
+              <Button
+                variant="outline"
+                onClick={onEdit}
+                className="border-blue-500 text-blue-500 hover:bg-blue-500/10 bg-transparent"
+              >
+                <Pencil className="mr-2 h-4 w-4" />
+                Modifica
+              </Button>
+            )}
             {!workout.completed && (
               <Button className="bg-fuchsia-600 hover:bg-fuchsia-700">
                 <Play className="mr-2 h-4 w-4" />
