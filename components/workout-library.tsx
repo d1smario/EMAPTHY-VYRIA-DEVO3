@@ -25,17 +25,14 @@ import {
   Footprints,
   Waves,
   Dumbbell,
-  Clock,
-  Target,
   Trash2,
-  Edit,
-  Copy,
   Check,
   X,
   Loader2,
   BookOpen,
   Activity,
   Mountain,
+  Pencil,
 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 
@@ -76,6 +73,7 @@ interface WorkoutLibraryProps {
   coachId?: string
   onSelectWorkout?: (workout: WorkoutTemplate, dayIndex: number) => void
   selectedDay?: number
+  onAssignToDay?: (dayIndex: number, workout: WorkoutTemplate) => Promise<void>
 }
 
 // Constants
@@ -122,7 +120,13 @@ const DAY_NAMES = ["Lunedì", "Martedì", "Mercoledì", "Giovedì", "Venerdì", 
 
 const generateId = () => Math.random().toString(36).substring(2, 9)
 
-export function WorkoutLibrary({ athleteId, coachId, onSelectWorkout, selectedDay }: WorkoutLibraryProps) {
+export function WorkoutLibrary({
+  athleteId,
+  coachId,
+  onSelectWorkout,
+  selectedDay,
+  onAssignToDay,
+}: WorkoutLibraryProps) {
   const supabase = createClient()
 
   // State
@@ -140,6 +144,11 @@ export function WorkoutLibrary({ athleteId, coachId, onSelectWorkout, selectedDa
   const [showCreateDialog, setShowCreateDialog] = useState(false)
   const [editingWorkout, setEditingWorkout] = useState<WorkoutTemplate | null>(null)
   const [selectedDayForCopy, setSelectedDayForCopy] = useState<number>(selectedDay ?? 0)
+
+  // Insert into Training dialog
+  const [showInsertDialog, setShowInsertDialog] = useState(false)
+  const [selectedWorkoutToInsert, setSelectedWorkoutToInsert] = useState<WorkoutTemplate | null>(null)
+  const [selectedDayIndex, setSelectedDayIndex] = useState<number>(0)
 
   // Form state
   const [formData, setFormData] = useState<Partial<WorkoutTemplate>>({
@@ -251,6 +260,23 @@ export function WorkoutLibrary({ athleteId, coachId, onSelectWorkout, selectedDa
       await loadWorkouts()
     } catch (error) {
       console.error("Error deleting workout:", error)
+    }
+  }
+
+  // Insert workout into training
+  const insertIntoTraining = async () => {
+    if (!selectedWorkoutToInsert || !onAssignToDay) return
+
+    try {
+      // Call the parent callback to insert workout
+      await onAssignToDay(selectedDayIndex, selectedWorkoutToInsert)
+
+      alert(`Allenamento inserito in ${DAY_NAMES[selectedDayIndex]}!`)
+      setShowInsertDialog(false)
+      setSelectedWorkoutToInsert(null)
+    } catch (error) {
+      console.error("Error inserting into training:", error)
+      alert("Errore nell'inserimento dell'allenamento")
     }
   }
 
@@ -455,55 +481,20 @@ export function WorkoutLibrary({ athleteId, coachId, onSelectWorkout, selectedDa
                   const SportIcon = getSportIcon(workout.sport)
 
                   return (
-                    <Card key={workout.id} className="hover:border-fuchsia-500/50 transition-all">
-                      <CardHeader className="pb-3">
-                        <div className="flex items-start justify-between">
-                          <div className="flex items-center gap-2">
-                            <div className={`p-2 rounded-lg ${typeInfo.color}/20`}>
-                              <SportIcon className={`h-5 w-5 ${typeInfo.color.replace("bg-", "text-")}`} />
-                            </div>
-                            <div>
-                              <CardTitle className="text-base">{workout.name}</CardTitle>
-                              <div className="flex items-center gap-2 mt-1">
-                                <Badge className={`${typeInfo.color} text-white text-xs`}>{typeInfo.name}</Badge>
-                                <Badge variant="outline" className="text-xs">
-                                  {workout.primary_zone}
-                                </Badge>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
+                    <Card key={workout.id} className="hover:shadow-md transition-shadow">
+                      <CardHeader>
+                        <CardTitle className="flex items-center gap-2 text-base">
+                          <span>{SportIcon}</span>
+                          <span>{workout.name}</span>
+                        </CardTitle>
                       </CardHeader>
-                      <CardContent className="space-y-3">
-                        {workout.description && (
-                          <p className="text-sm text-muted-foreground line-clamp-2">{workout.description}</p>
-                        )}
-
-                        <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                          <div className="flex items-center gap-1">
-                            <Clock className="h-4 w-4" />
-                            {workout.duration_minutes}'
-                          </div>
-                          {workout.tss_estimate && (
-                            <div className="flex items-center gap-1">
-                              <Target className="h-4 w-4" />
-                              {workout.tss_estimate} TSS
-                            </div>
-                          )}
+                      <CardContent className="space-y-2">
+                        <div className="text-sm text-muted-foreground">
+                          <p>
+                            {workout.duration_minutes} min • {workout.tss_estimate} TSS
+                          </p>
+                          {workout.description && <p className="mt-1 line-clamp-2">{workout.description}</p>}
                         </div>
-
-                        {workout.intervals && workout.intervals.length > 0 && (
-                          <div className="flex h-4 rounded overflow-hidden">
-                            {workout.intervals.map((block, idx) => (
-                              <div
-                                key={idx}
-                                className={`${ZONE_COLORS[block.zone] || "bg-slate-500"} flex-1`}
-                                title={`${block.name}: ${block.zone}`}
-                              />
-                            ))}
-                          </div>
-                        )}
-
                         {workout.tags && workout.tags.length > 0 && (
                           <div className="flex flex-wrap gap-1">
                             {workout.tags.map((tag) => (
@@ -513,45 +504,25 @@ export function WorkoutLibrary({ athleteId, coachId, onSelectWorkout, selectedDa
                             ))}
                           </div>
                         )}
-
-                        <div className="flex items-center gap-2 pt-2 border-t">
-                          {onSelectWorkout && (
-                            <Select
-                              value={selectedDayForCopy.toString()}
-                              onValueChange={(v) => setSelectedDayForCopy(Number.parseInt(v))}
-                            >
-                              <SelectTrigger className="flex-1 h-8 text-xs">
-                                <SelectValue placeholder="Giorno" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {DAY_NAMES.map((day, idx) => (
-                                  <SelectItem key={idx} value={idx.toString()}>
-                                    {day}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          )}
-                          {onSelectWorkout && (
-                            <Button
-                              size="sm"
-                              onClick={() => onSelectWorkout(workout, selectedDayForCopy)}
-                              className="bg-fuchsia-600 hover:bg-fuchsia-700 h-8"
-                            >
-                              <Copy className="h-3 w-3 mr-1" />
-                              Assegna
-                            </Button>
-                          )}
-                          <Button size="sm" variant="ghost" onClick={() => openEditDialog(workout)} className="h-8">
-                            <Edit className="h-3 w-3" />
+                        <div className="flex gap-2 pt-2">
+                          <Button size="sm" variant="outline" onClick={() => openEditDialog(workout)}>
+                            <Pencil className="h-3 w-3 mr-1" />
+                            Modifica
+                          </Button>
+                          <Button size="sm" variant="destructive" onClick={() => deleteWorkout(workout.id)}>
+                            <Trash2 className="h-3 w-3 mr-1" />
+                            Elimina
                           </Button>
                           <Button
                             size="sm"
-                            variant="ghost"
-                            onClick={() => deleteWorkout(workout.id)}
-                            className="h-8 text-red-400 hover:text-red-300"
+                            className="ml-auto"
+                            onClick={() => {
+                              setSelectedWorkoutToInsert(workout)
+                              setShowInsertDialog(true)
+                            }}
                           >
-                            <Trash2 className="h-3 w-3" />
+                            <Plus className="h-3 w-3 mr-1" />
+                            Usa in Training
                           </Button>
                         </div>
                       </CardContent>
@@ -831,7 +802,43 @@ export function WorkoutLibrary({ athleteId, coachId, onSelectWorkout, selectedDa
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <Dialog open={showInsertDialog} onOpenChange={setShowInsertDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Inserisci in Training</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="p-3 bg-muted rounded-md">
+              <p className="font-medium">{selectedWorkoutToInsert?.name}</p>
+              <p className="text-sm text-muted-foreground">
+                {selectedWorkoutToInsert?.duration_minutes} min • {selectedWorkoutToInsert?.tss_estimate} TSS
+              </p>
+            </div>
+            <div>
+              <Label>Seleziona giorno</Label>
+              <div className="grid grid-cols-2 gap-2 mt-2">
+                {DAY_NAMES.map((dayName, index) => (
+                  <Button
+                    key={index}
+                    variant={selectedDayIndex === index ? "default" : "outline"}
+                    className="w-full"
+                    onClick={() => setSelectedDayIndex(index)}
+                  >
+                    {dayName}
+                  </Button>
+                ))}
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowInsertDialog(false)}>
+              Annulla
+            </Button>
+            <Button onClick={insertIntoTraining}>Inserisci</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
-
