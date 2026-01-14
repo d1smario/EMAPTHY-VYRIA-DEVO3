@@ -1744,9 +1744,9 @@ function NutritionPlan({ athleteData, userName }: NutritionPlanProps) {
     // Determine workout start time for accurate timing
     const workoutStartTime = selectedActivity.scheduled_time
       ? parsePreferredTimeToHour(selectedActivity.scheduled_time)
-      : workoutMetrics.zone > 1
-        ? 7 // Default to morning if not specified and not rest
-        : 10 // Default to mid-morning for rest days
+      : trainingPreferences.preferred_training_time
+        ? parsePreferredTimeToHour(trainingPreferences.preferred_training_time)
+        : 10 // Default to mid-morning only if no preferences set
 
     // Start fueling after 20 minutes for workouts > 60min, or 30min for shorter
     const fuelingStartTime = duration > 60 ? 20 : 30
@@ -1834,7 +1834,7 @@ function NutritionPlan({ athleteData, userName }: NutritionPlanProps) {
     }
 
     return intervals
-  }, [selectedActivity, workoutMetrics.duration, intraWorkCho, sportSupplements])
+  }, [selectedActivity, workoutMetrics.duration, intraWorkCho, sportSupplements, trainingPreferences])
 
   // Placeholder for intraWorkoutStack, as intraWorkoutTiming now shows the details
   const intraWorkoutStack = useMemo(() => {
