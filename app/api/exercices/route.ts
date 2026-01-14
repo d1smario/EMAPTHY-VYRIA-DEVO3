@@ -41,17 +41,16 @@ export async function GET(request: NextRequest) {
     }
 
     const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), 10000) // 10s timeout
+    const timeoutId = setTimeout(() => controller.abort(), 10000)
 
     const response = await fetch(url, {
       headers: getHeaders(),
       signal: controller.signal,
       cache: "force-cache",
-    }).catch(() => null) // Cattura errori di rete silenziosamente
+    }).catch(() => null)
 
     clearTimeout(timeoutId)
 
-    // Se la richiesta è fallita o ha restituito errore, usa il fallback silenziosamente
     if (!response || !response.ok) {
       console.log("[v0] ExerciseDB returned status:", response?.status, "- using fallback")
       return NextResponse.json({
@@ -69,7 +68,6 @@ export async function GET(request: NextRequest) {
       count: exercises.length,
     })
   } catch {
-    // Cattura tutti gli errori silenziosamente e usa il fallback
     return NextResponse.json({
       exercises: getFallbackExercises(bodyPart),
       source: "fallback",
@@ -77,21 +75,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// Mapping bodyPart ExerciseDB -> muscleGroup locale
-const BODY_PART_MAP: Record<string, string> = {
-  chest: "chest",
-  back: "back",
-  shoulders: "shoulders",
-  "upper arms": "arms",
-  "lower arms": "arms",
-  "upper legs": "legs",
-  "lower legs": "calves",
-  waist: "core",
-  cardio: "cardio",
-  neck: "shoulders",
-}
-
-// Database locale di fallback
+// Database locale di fallback con 54 esercizi
 function getFallbackExercises(bodyPart: string | null) {
   const exercises = [
     // PETTO
@@ -161,7 +145,6 @@ function getFallbackExercises(bodyPart: string | null) {
       gifUrl: "/pec-deck-machine.jpg",
       instructions: ["Siediti alla macchina", "Porta le braccia al centro", "Contrai il petto"],
     },
-
     // DORSALI
     {
       id: "back-1",
@@ -229,7 +212,6 @@ function getFallbackExercises(bodyPart: string | null) {
       gifUrl: "/t-bar-row-exercise.jpg",
       instructions: ["Afferra la T-bar", "Tira verso il petto", "Contrai la schiena"],
     },
-
     // SPALLE
     {
       id: "shoulders-1",
@@ -297,7 +279,6 @@ function getFallbackExercises(bodyPart: string | null) {
       gifUrl: "/reverse-fly-exercise.png",
       instructions: ["Piegati in avanti", "Apri le braccia", "Contrai il deltoide posteriore"],
     },
-
     // BRACCIA
     {
       id: "arms-1",
@@ -365,7 +346,6 @@ function getFallbackExercises(bodyPart: string | null) {
       gifUrl: "/overhead-tricep-extension.jpg",
       instructions: ["Porta il manubrio sopra la testa", "Abbassa dietro", "Estendi"],
     },
-
     // GAMBE
     {
       id: "legs-1",
@@ -433,7 +413,6 @@ function getFallbackExercises(bodyPart: string | null) {
       gifUrl: "/lunges-exercise.png",
       instructions: ["Fai un passo avanti", "Scendi in affondo", "Spingi e torna"],
     },
-
     // GLUTEI
     {
       id: "glutes-1",
@@ -501,7 +480,6 @@ function getFallbackExercises(bodyPart: string | null) {
       gifUrl: "/step-ups-exercise.jpg",
       instructions: ["Sali su una panca", "Spingi col tallone", "Scendi controllato"],
     },
-
     // CORE
     {
       id: "core-1",
@@ -566,10 +544,9 @@ function getFallbackExercises(bodyPart: string | null) {
       target: "abs",
       secondaryMuscles: ["spine"],
       equipment: "body weight",
-      gifUrl: "/placeholder.svg?height=300&width=300",
+      gifUrl: "/dead-bug-exercise.png",
       instructions: ["Sdraiati supino", "Estendi braccio e gamba opposti", "Alterna"],
     },
-
     // POLPACCI
     {
       id: "calves-1",
@@ -579,7 +556,7 @@ function getFallbackExercises(bodyPart: string | null) {
       target: "calves",
       secondaryMuscles: [],
       equipment: "machine",
-      gifUrl: "/placeholder.svg?height=300&width=300",
+      gifUrl: "/standing-calf-raise.jpg",
       instructions: ["Posizionati alla macchina", "Solleva sui talloni", "Contrai i polpacci"],
     },
     {
@@ -590,7 +567,7 @@ function getFallbackExercises(bodyPart: string | null) {
       target: "calves",
       secondaryMuscles: [],
       equipment: "machine",
-      gifUrl: "/placeholder.svg?height=300&width=300",
+      gifUrl: "/seated-calf-raise.jpg",
       instructions: ["Siediti alla macchina", "Solleva i talloni", "Contrai i polpacci"],
     },
     {
@@ -601,7 +578,7 @@ function getFallbackExercises(bodyPart: string | null) {
       target: "calves",
       secondaryMuscles: [],
       equipment: "machine",
-      gifUrl: "/placeholder.svg?height=300&width=300",
+      gifUrl: "/donkey-calf-raise.jpg",
       instructions: ["Piegati in avanti", "Solleva sui talloni", "Contrai i polpacci"],
     },
     {
@@ -612,10 +589,9 @@ function getFallbackExercises(bodyPart: string | null) {
       target: "calves",
       secondaryMuscles: ["quads"],
       equipment: "body weight",
-      gifUrl: "/placeholder.svg?height=300&width=300",
+      gifUrl: "/jump-rope-exercise.png",
       instructions: ["Impugna la corda", "Salta ritmicamente", "Atterra sugli avampiedi"],
     },
-
     // CARDIO
     {
       id: "cardio-1",
@@ -625,7 +601,7 @@ function getFallbackExercises(bodyPart: string | null) {
       target: "cardiovascular system",
       secondaryMuscles: ["quads", "calves"],
       equipment: "machine",
-      gifUrl: "/placeholder.svg?height=300&width=300",
+      gifUrl: "/treadmill-running.png",
       instructions: ["Imposta la velocità", "Corri mantenendo la postura", "Respira ritmicamente"],
     },
     {
@@ -636,7 +612,7 @@ function getFallbackExercises(bodyPart: string | null) {
       target: "cardiovascular system",
       secondaryMuscles: ["quads", "hamstrings"],
       equipment: "machine",
-      gifUrl: "/placeholder.svg?height=300&width=300",
+      gifUrl: "/cycling-exercise.png",
       instructions: ["Regola il sellino", "Pedala costantemente", "Mantieni la cadenza"],
     },
     {
@@ -647,21 +623,20 @@ function getFallbackExercises(bodyPart: string | null) {
       target: "cardiovascular system",
       secondaryMuscles: ["lats", "quads"],
       equipment: "machine",
-      gifUrl: "/placeholder.svg?height=300&width=300",
+      gifUrl: "/rowing-machine-exercise.jpg",
       instructions: ["Afferra la maniglia", "Spingi con le gambe", "Tira con le braccia"],
     },
     {
       id: "cardio-4",
-      name: "Burpees",
-      nameIt: "Burpees",
+      name: "Elliptical",
+      nameIt: "Ellittica",
       bodyPart: "cardio",
       target: "cardiovascular system",
-      secondaryMuscles: ["chest", "quads"],
-      equipment: "body weight",
-      gifUrl: "/placeholder.svg?height=300&width=300",
-      instructions: ["Scendi in squat", "Salta indietro in plank", "Fai push up e salta"],
+      secondaryMuscles: ["quads", "glutes"],
+      equipment: "machine",
+      gifUrl: "/elliptical-machine.jpg",
+      instructions: ["Sali sulla macchina", "Muovi braccia e gambe", "Mantieni il ritmo"],
     },
-
     // STRETCHING
     {
       id: "stretch-1",
@@ -671,7 +646,7 @@ function getFallbackExercises(bodyPart: string | null) {
       target: "hamstrings",
       secondaryMuscles: [],
       equipment: "body weight",
-      gifUrl: "/placeholder.svg?height=300&width=300",
+      gifUrl: "/hamstring-stretch.jpg",
       instructions: ["Siediti a terra", "Allunga verso i piedi", "Mantieni 30 secondi"],
     },
     {
@@ -682,37 +657,50 @@ function getFallbackExercises(bodyPart: string | null) {
       target: "quads",
       secondaryMuscles: [],
       equipment: "body weight",
-      gifUrl: "/placeholder.svg?height=300&width=300",
-      instructions: ["In piedi su una gamba", "Afferra il piede", "Tira verso il gluteo"],
+      gifUrl: "/quad-stretch.jpg",
+      instructions: ["In piedi", "Afferra il piede dietro", "Mantieni 30 secondi"],
     },
     {
       id: "stretch-3",
-      name: "Hip Flexor Stretch",
-      nameIt: "Stretching Flessori Anca",
-      bodyPart: "upper legs",
-      target: "hip flexors",
-      secondaryMuscles: [],
-      equipment: "body weight",
-      gifUrl: "/placeholder.svg?height=300&width=300",
-      instructions: ["Affondo profondo", "Spingi il bacino avanti", "Mantieni 30 secondi"],
-    },
-    {
-      id: "stretch-4",
       name: "Chest Stretch",
-      nameIt: "Stretching Petto",
+      nameIt: "Stretching Pettorali",
       bodyPart: "chest",
       target: "pectorals",
       secondaryMuscles: [],
       equipment: "body weight",
-      gifUrl: "/placeholder.svg?height=300&width=300",
-      instructions: ["Braccio su stipite", "Ruota il corpo", "Mantieni 30 secondi"],
+      gifUrl: "/chest-stretch.jpg",
+      instructions: ["Braccio contro il muro", "Ruota il corpo", "Mantieni 30 secondi"],
+    },
+    {
+      id: "stretch-4",
+      name: "Shoulder Stretch",
+      nameIt: "Stretching Spalle",
+      bodyPart: "shoulders",
+      target: "delts",
+      secondaryMuscles: [],
+      equipment: "body weight",
+      gifUrl: "/shoulder-stretch.jpg",
+      instructions: ["Braccio attraverso il petto", "Tira con l'altro braccio", "Mantieni 30 secondi"],
     },
   ]
 
-  if (bodyPart && bodyPart !== "all") {
-    const mappedPart = BODY_PART_MAP[bodyPart] || bodyPart
-    return exercises.filter((e) => e.bodyPart === bodyPart || e.bodyPart === mappedPart)
+  if (!bodyPart || bodyPart === "all") {
+    return exercises
   }
 
-  return exercises
+  // Mappa bodyPart ExerciseDB ai nostri gruppi
+  const bodyPartMap: Record<string, string[]> = {
+    chest: ["chest"],
+    back: ["back"],
+    shoulders: ["shoulders"],
+    "upper arms": ["upper arms"],
+    "lower arms": ["lower arms"],
+    "upper legs": ["upper legs"],
+    "lower legs": ["lower legs"],
+    waist: ["waist"],
+    cardio: ["cardio"],
+  }
+
+  const targetParts = bodyPartMap[bodyPart] || [bodyPart]
+  return exercises.filter((ex) => targetParts.includes(ex.bodyPart))
 }
