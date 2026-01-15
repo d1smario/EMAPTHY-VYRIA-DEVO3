@@ -1429,6 +1429,7 @@ function NutritionPlan({ athleteData, userName }: NutritionPlanProps) {
           })
           console.log("[v0] Loaded training preferences from annual_plan:", prefs)
         } else {
+          // </CHANGE>
           // Fallback: try athlete_constraints.notes
           const { data: constraintsForPrefs } = await supabase
             .from("athlete_constraints")
@@ -1452,6 +1453,7 @@ function NutritionPlan({ athleteData, userName }: NutritionPlanProps) {
               console.log("[v0] Error parsing training preferences from notes:", e)
             }
           }
+          // </CHANGE>
         }
 
         // Load activities for current week
@@ -1742,9 +1744,9 @@ function NutritionPlan({ athleteData, userName }: NutritionPlanProps) {
     const intervals: { time: number; product: string; cho: number; brand: string; details: string }[] = []
 
     // Determine workout start time for accurate timing
-    const workoutStartTime = selectedActivity.scheduled_time
+    const workoutStartTime = selectedActivity?.scheduled_time
       ? parsePreferredTimeToHour(selectedActivity.scheduled_time)
-      : trainingPreferences.preferred_training_time
+      : trainingPreferences?.preferred_training_time
         ? parsePreferredTimeToHour(trainingPreferences.preferred_training_time)
         : 10 // Default to mid-morning only if no preferences set
 
