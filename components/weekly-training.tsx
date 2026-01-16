@@ -467,7 +467,7 @@ function WeeklyTraining({ athleteData, userName, workouts }: WeeklyTrainingProps
       activity_type: "gym",
       workout_type: "strength",
       description: `${gymData.exercises?.length || 0} esercizi`,
-      duration_planned: gymData.duration || 60,
+      duration_minutes: gymData.duration || 60,
       target_zone: "GYM",
       activity_date: targetDate.toISOString().split("T")[0],
       intervals: {
@@ -496,7 +496,7 @@ function WeeklyTraining({ athleteData, userName, workouts }: WeeklyTrainingProps
           activity_type: data.activity_type,
           workout_type: data.workout_type,
           description: data.description,
-          duration_planned: data.duration_planned,
+          duration_minutes: data.duration_minutes,
           target_zone: data.target_zone,
           activity_date: data.activity_date,
           intervals: data.intervals,
@@ -626,87 +626,100 @@ function WeeklyTraining({ athleteData, userName, workouts }: WeeklyTrainingProps
         {weekDates.map((date, index) => {
           const dayWorkouts = getWorkoutsForDay(date)
           const isToday = date.toDateString() === today.toDateString()
-          const mainWorkout = dayWorkouts[0]
 
           return (
             <Card
               key={index}
               className={`cursor-pointer transition-all hover:ring-2 hover:ring-primary/50 ${
                 isToday ? "ring-2 ring-primary" : ""
-              } ${!mainWorkout ? "opacity-60" : ""}`}
-              onClick={() => (mainWorkout ? setSelectedWorkout(mainWorkout) : handleAddWorkout(index))}
+              } ${dayWorkouts.length === 0 ? "opacity-60" : ""}`}
+              onClick={() => (dayWorkouts.length > 0 ? setSelectedWorkout(dayWorkouts[0]) : handleAddWorkout(index))}
             >
               <CardHeader className="p-2 pb-0">
                 <div className="flex items-center justify-between">
                   <span className={`text-xs font-medium ${isToday ? "text-primary" : "text-muted-foreground"}`}>
                     {dayNames[index]} {isToday && "(Oggi)"}
                   </span>
-                  {mainWorkout && (
-                    <Badge className={`text-[10px] px-1 ${getZoneColor(mainWorkout.target_zone)}`}>
-                      {mainWorkout.target_zone || "Z2"}
+                  {dayWorkouts.length > 1 && (
+                    <Badge variant="secondary" className="text-[10px] px-1">
+                      {dayWorkouts.length}
                     </Badge>
                   )}
                 </div>
               </CardHeader>
               <CardContent className="p-2 pt-1">
-                {mainWorkout ? (
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-1">
-                      {getWorkoutIcon(mainWorkout.activity_type || mainWorkout.workout_type || "")}
-                      <span className="text-xs font-medium truncate">
-                        {mainWorkout.title?.split(" - ")[0] || "Allenamento"}
-                      </span>
-                    </div>
-                    <p className="text-[10px] text-muted-foreground truncate">
-                      {mainWorkout.title?.split(" - ")[1] || mainWorkout.description?.substring(0, 20)}
-                    </p>
-                    <div className="flex items-center justify-between text-[10px] text-muted-foreground">
-                      <span className="flex items-center gap-1">
-                        <Clock className="h-3 w-3" />
-                        {formatDuration(mainWorkout.duration_minutes || 0)}
-                      </span>
-                      {mainWorkout.tss && <span>{mainWorkout.tss} TSS</span>}
-                    </div>
-                    {mainWorkout.completed && (
-                      <div className="flex items-center gap-1 text-green-500">
-                        <CheckCircle2 className="h-3 w-3" />
-                        <span className="text-[10px]">Completato</span>
+                {dayWorkouts.length > 0 ? (
+                  <div className="space-y-2">
+                    {dayWorkouts.map((workout, wIndex) => (
+                      <div
+                        key={workout.id || wIndex}
+                        className={`space-y-1 ${wIndex > 0 ? "pt-2 border-t border-border/50" : ""}`}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setSelectedWorkout(workout)
+                        }}
+                      >
+                        <div className="flex items-center gap-1">
+                          {getWorkoutIcon(workout.activity_type || workout.workout_type || "")}
+                          <span className="text-xs font-medium truncate flex-1">
+                            {workout.title?.split(" - ")[0] || "Allenamento"}
+                          </span>
+                          <Badge className={`text-[10px] px-1 ${getZoneColor(workout.target_zone)}`}>
+                            {workout.target_zone || "Z2"}
+                          </Badge>
+                        </div>
+                        <div className="flex items-center justify-between text-[10px] text-muted-foreground">
+                          <span className="flex items-center gap-1">
+                            <Clock className="h-3 w-3" />
+                            {formatDuration(workout.duration_minutes || 0)}
+                          </span>
+                          {workout.tss && <span>{workout.tss} TSS</span>}
+                        </div>
+                        {workout.completed && (
+                          <div className="flex items-center gap-1 text-green-500">
+                            <CheckCircle2 className="h-3 w-3" />
+                            <span className="text-[10px]">Completato</span>
+                          </div>
+                        )}
+                        {/* Action buttons for each workout */}
+                        <div className="flex gap-1 mt-1">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-6 w-6 p-0"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleEditWorkout(workout, index)
+                            }}
+                          >
+                            <Pencil className="h-3 w-3 text-blue-500" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-6 w-6 p-0"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleDeleteWorkout(workout)
+                            }}
+                          >
+                            <Trash2 className="h-3 w-3 text-red-500" />
+                          </Button>
+                        </div>
                       </div>
-                    )}
-                    {/* Action buttons */}
-                    <div className="flex gap-1 mt-1 pt-1 border-t border-border/50">
+                    ))}
+                    <div className="flex justify-center pt-1 border-t border-border/50">
                       <Button
                         size="sm"
                         variant="ghost"
-                        className="h-6 w-6 p-0"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          handleEditWorkout(mainWorkout, index)
-                        }}
-                      >
-                        <Pencil className="h-3 w-3 text-blue-500" />
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="h-6 w-6 p-0"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          handleDeleteWorkout(mainWorkout)
-                        }}
-                      >
-                        <Trash2 className="h-3 w-3 text-red-500" />
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="h-6 w-6 p-0 ml-auto"
+                        className="h-6 px-2"
                         onClick={(e) => {
                           e.stopPropagation()
                           handleAddWorkout(index)
                         }}
                       >
-                        <Plus className="h-3 w-3 text-green-500" />
+                        <Plus className="h-3 w-3 mr-1 text-green-500" />
+                        <span className="text-xs">Aggiungi</span>
                       </Button>
                     </div>
                   </div>
@@ -1016,14 +1029,16 @@ function WeeklyTraining({ athleteData, userName, workouts }: WeeklyTrainingProps
 
       {/* Dialog Importa Palestra */}
       <Dialog open={showGymDialog} onOpenChange={setShowGymDialog}>
-        <DialogContent className="max-w-6xl h-[90vh] flex flex-col p-0">
-          <DialogHeader className="p-6 pb-0">
-            <DialogTitle className="flex items-center gap-2">
+        <DialogContent className="max-w-6xl h-[90vh] flex flex-col p-0 bg-zinc-900 border border-zinc-700 overflow-hidden z-50 [&>button]:text-white">
+          <div className="fixed inset-0 bg-black/80 -z-10" />
+          <DialogHeader className="p-6 pb-0 shrink-0 bg-zinc-900">
+            <DialogTitle className="flex items-center gap-2 text-white">
               <Dumbbell className="h-5 w-5 text-orange-500" />
               Importa Scheda Palestra - {dayNames[selectedGymDay]}
             </DialogTitle>
           </DialogHeader>
-          <div className="flex-1 overflow-hidden p-6 pt-4">
+          {/* Scrollable Content */}
+          <div className="flex-1 overflow-y-auto p-6 pt-4 bg-zinc-900">
             <GymExerciseLibrary
               onSaveWorkout={handleSaveGymWorkout}
               selectedDay={selectedGymDay}
