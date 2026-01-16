@@ -1,3 +1,9 @@
+export async function GET(request: NextRequest) {
+  console.log("[v0] API exercises called")
+  console.log("[v0] RAPID_API_KEY:", process.env.RAPID_API_KEY ? "exists" : "missing")
+  
+  // ... resto del codice
+}
 import { NextRequest, NextResponse } from "next/server"
 
 // Fallback database locale per quando l'API non è disponibile
