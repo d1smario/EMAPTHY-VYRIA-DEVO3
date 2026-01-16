@@ -3,14 +3,13 @@ import { NextRequest, NextResponse } from "next/server"
 const LOCAL_EXERCISES_DB: Record<string, any[]> = {
   chest: [
     { id: "chest1", name: "Bench Press", nameIt: "Panca Piana", target: "pectorals", equipment: "barbell", gifUrl: "/placeholder.svg?height=200&width=200", secondaryMuscles: ["triceps"], instructions: [] },
-    { id: "chest2", name: "Incline Dumbbell Press", nameIt: "Panca Inclinata", target: "pectorals", equipment: "dumbbell", gifUrl: "/placeholder.svg?height=200&width=200", secondaryMuscles: ["triceps"], instructions: [] },
-    { id: "chest3", name: "Cable Fly", nameIt: "Croci ai Cavi", target: "pectorals", equipment: "cable", gifUrl: "/placeholder.svg?height=200&width=200", secondaryMuscles: [], instructions: [] },
+    { id: "chest2", name: "Incline Press", nameIt: "Panca Inclinata", target: "pectorals", equipment: "dumbbell", gifUrl: "/placeholder.svg?height=200&width=200", secondaryMuscles: ["triceps"], instructions: [] },
+    { id: "chest3", name: "Cable Fly", nameIt: "Croci Cavi", target: "pectorals", equipment: "cable", gifUrl: "/placeholder.svg?height=200&width=200", secondaryMuscles: [], instructions: [] },
     { id: "chest4", name: "Push Ups", nameIt: "Piegamenti", target: "pectorals", equipment: "body weight", gifUrl: "/placeholder.svg?height=200&width=200", secondaryMuscles: ["triceps"], instructions: [] },
-    { id: "chest5", name: "Chest Dips", nameIt: "Dip Petto", target: "pectorals", equipment: "body weight", gifUrl: "/placeholder.svg?height=200&width=200", secondaryMuscles: ["triceps"], instructions: [] },
   ],
   back: [
     { id: "back1", name: "Lat Pulldown", nameIt: "Lat Machine", target: "lats", equipment: "cable", gifUrl: "/placeholder.svg?height=200&width=200", secondaryMuscles: ["biceps"], instructions: [] },
-    { id: "back2", name: "Barbell Row", nameIt: "Rematore Bilanciere", target: "lats", equipment: "barbell", gifUrl: "/placeholder.svg?height=200&width=200", secondaryMuscles: ["biceps"], instructions: [] },
+    { id: "back2", name: "Barbell Row", nameIt: "Rematore", target: "lats", equipment: "barbell", gifUrl: "/placeholder.svg?height=200&width=200", secondaryMuscles: ["biceps"], instructions: [] },
     { id: "back3", name: "Pull Ups", nameIt: "Trazioni", target: "lats", equipment: "body weight", gifUrl: "/placeholder.svg?height=200&width=200", secondaryMuscles: ["biceps"], instructions: [] },
   ],
   shoulders: [
@@ -24,7 +23,7 @@ const LOCAL_EXERCISES_DB: Record<string, any[]> = {
   upper_legs: [
     { id: "leg1", name: "Squat", nameIt: "Squat", target: "quads", equipment: "barbell", gifUrl: "/placeholder.svg?height=200&width=200", secondaryMuscles: ["glutes"], instructions: [] },
     { id: "leg2", name: "Leg Press", nameIt: "Leg Press", target: "quads", equipment: "machine", gifUrl: "/placeholder.svg?height=200&width=200", secondaryMuscles: ["glutes"], instructions: [] },
-    { id: "leg3", name: "Romanian Deadlift", nameIt: "Stacco Rumeno", target: "hamstrings", equipment: "barbell", gifUrl: "/placeholder.svg?height=200&width=200", secondaryMuscles: ["glutes"], instructions: [] },
+    { id: "leg3", name: "Leg Curl", nameIt: "Leg Curl", target: "hamstrings", equipment: "machine", gifUrl: "/placeholder.svg?height=200&width=200", secondaryMuscles: [], instructions: [] },
   ],
   glutes: [
     { id: "gl1", name: "Hip Thrust", nameIt: "Hip Thrust", target: "glutes", equipment: "barbell", gifUrl: "/placeholder.svg?height=200&width=200", secondaryMuscles: [], instructions: [] },
@@ -60,7 +59,6 @@ const BODYPART_SEARCH: Record<string, string> = {
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams
   const bodyPart = searchParams.get("bodyPart") || "chest"
-
   const apiKey = process.env.RAPID_API_KEY || process.env.RAPIDAPI_KEY
 
   if (!apiKey) {
@@ -108,7 +106,7 @@ export async function GET(request: NextRequest) {
       nameIt: ex.name || ex.exerciseName || "Esercizio",
       target: ex.targetMuscle || ex.target || bodyPart,
       equipment: ex.equipmentNeeded || ex.equipment || "body weight",
-      gifUrl: ex.gifUrl || ex.image || ex.videoUrl || `/placeholder.svg?height=200&width=200&query=${encodeURIComponent(ex.name || "exercise")}`,
+      gifUrl: ex.gifUrl || ex.image || ex.videoUrl || `/placeholder.svg?height=200&width=200`,
       secondaryMuscles: ex.secondaryMuscles || [],
       instructions: ex.instructions || [],
     }))
