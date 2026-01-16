@@ -175,7 +175,7 @@ export function WorkoutDetailModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto bg-card">
+      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto bg-zinc-900 border-zinc-700">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-3">
             <div
