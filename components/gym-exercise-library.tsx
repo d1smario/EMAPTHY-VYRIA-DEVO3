@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { Dumbbell, Search, Plus, Clock, Flame, X, RotateCcw, Save, Calendar, Loader2, FileDown } from "lucide-react"
+import { Dumbbell, Plus, Clock, Flame, X, RotateCcw, Save, Calendar, Loader2, FileDown } from "lucide-react"
 import Image from "next/image"
 
 // Types
@@ -289,7 +289,7 @@ export default function GymExerciseLibrary({
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 bg-background">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
@@ -318,6 +318,7 @@ export default function GymExerciseLibrary({
         </div>
       </div>
 
+      {/* Muscle Group Buttons - 2 righe */}
       <div className="grid grid-cols-5 gap-2">
         {MUSCLE_GROUPS.map((group) => (
           <Button
@@ -332,21 +333,10 @@ export default function GymExerciseLibrary({
         ))}
       </div>
 
-      {/* Search */}
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input
-          placeholder="Cerca esercizio..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="pl-10"
-        />
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
         {/* Exercise list */}
-        <div className="lg:col-span-2">
-          <Card>
+        <div className="lg:col-span-3">
+          <Card className="bg-card">
             <CardHeader className="py-3">
               <CardTitle className="text-sm">
                 Esercizi {MUSCLE_GROUPS.find((g) => g.id === selectedGroup)?.name} ({filteredExercises.length})
@@ -361,7 +351,7 @@ export default function GymExerciseLibrary({
               ) : error ? (
                 <div className="text-center py-8 text-red-500">{error}</div>
               ) : (
-                <ScrollArea className="h-[400px]">
+                <ScrollArea className="h-[500px]">
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-2 p-2">
                     {filteredExercises.map((exercise) => (
                       <Card
@@ -398,9 +388,9 @@ export default function GymExerciseLibrary({
           </Card>
         </div>
 
-        {/* Selected exercises / Workout builder */}
-        <div>
-          <Card>
+        {/* Workout builder */}
+        <div className="lg:col-span-2">
+          <Card className="bg-card">
             <CardHeader className="py-3">
               <CardTitle className="text-sm flex items-center justify-between">
                 <span>Scheda ({selectedExercises.length})</span>
@@ -416,9 +406,10 @@ export default function GymExerciseLibrary({
                 placeholder="Nome scheda..."
                 value={workoutName}
                 onChange={(e) => setWorkoutName(e.target.value)}
+                className="bg-background"
               />
 
-              <ScrollArea className="h-[250px]">
+              <ScrollArea className="h-[350px]">
                 {selectedExercises.length === 0 ? (
                   <p className="text-sm text-muted-foreground text-center py-4">
                     Clicca sugli esercizi per aggiungerli
@@ -435,43 +426,43 @@ export default function GymExerciseLibrary({
                             <X className="h-3 w-3" />
                           </Button>
                         </div>
-                        <div className="grid grid-cols-4 gap-1">
+                        <div className="grid grid-cols-2 gap-2">
                           <div>
-                            <Label className="text-xs">Serie</Label>
+                            <Label className="text-xs text-white">Serie</Label>
                             <Input
                               type="number"
                               value={ex.sets}
                               onChange={(e) => updateExercise(ex.id, "sets", Number.parseInt(e.target.value) || 0)}
-                              className="h-7 text-xs"
+                              className="h-8 w-full min-w-[60px] text-sm text-white bg-zinc-800 border-zinc-600 text-center"
                             />
                           </div>
                           <div>
-                            <Label className="text-xs">Reps</Label>
+                            <Label className="text-xs text-white">Reps</Label>
                             <Input
                               type="number"
                               value={ex.reps}
                               onChange={(e) => updateExercise(ex.id, "reps", Number.parseInt(e.target.value) || 0)}
-                              className="h-7 text-xs"
+                              className="h-8 w-full min-w-[60px] text-sm text-white bg-zinc-800 border-zinc-600 text-center"
                             />
                           </div>
                           <div>
-                            <Label className="text-xs">Kg</Label>
+                            <Label className="text-xs text-white">Kg</Label>
                             <Input
                               type="number"
                               value={ex.weight}
                               onChange={(e) => updateExercise(ex.id, "weight", Number.parseInt(e.target.value) || 0)}
-                              className="h-7 text-xs"
+                              className="h-8 w-full min-w-[60px] text-sm text-white bg-zinc-800 border-zinc-600 text-center"
                             />
                           </div>
                           <div>
-                            <Label className="text-xs">Rec</Label>
+                            <Label className="text-xs text-white">Rec(s)</Label>
                             <Input
                               type="number"
                               value={ex.restSeconds}
                               onChange={(e) =>
                                 updateExercise(ex.id, "restSeconds", Number.parseInt(e.target.value) || 0)
                               }
-                              className="h-7 text-xs"
+                              className="h-8 w-full min-w-[60px] text-sm text-white bg-zinc-800 border-zinc-600 text-center"
                             />
                           </div>
                         </div>
