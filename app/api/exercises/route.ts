@@ -101,12 +101,12 @@ export async function GET(request: NextRequest) {
     }
 
     const exercises = exercisesArray.slice(0, 20).map((ex: any) => ({
-      id: ex.id || ex.exerciseId || Math.random().toString(36).substr(2, 9),
+      id: ex.exerciseId || ex.id || Math.random().toString(36).substr(2, 9),
       name: ex.name || ex.exerciseName || "Exercise",
       nameIt: ex.name || ex.exerciseName || "Esercizio",
       target: ex.targetMuscle || ex.target || bodyPart,
       equipment: ex.equipmentNeeded || ex.equipment || "body weight",
-      gifUrl: ex.gifUrl || ex.image || ex.videoUrl || `/placeholder.svg?height=200&width=200`,
+      gifUrl: ex.imageUrl || ex.gifUrl || ex.image || ex.videoUrl || `/placeholder.svg?height=200&width=200`,
       secondaryMuscles: ex.secondaryMuscles || [],
       instructions: ex.instructions || [],
     }))
