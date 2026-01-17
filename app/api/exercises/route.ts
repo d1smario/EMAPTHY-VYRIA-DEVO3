@@ -56,6 +56,33 @@ const BODYPART_SEARCH: Record<string, string> = {
   glutes: "glute",
 }
 
+const BODYPART_TARGET: Record<string, string> = {
+  chest: "pectorals",
+  back: "lats",
+  shoulders: "delts",
+  upper_arms: "biceps/triceps",
+  lower_arms: "forearms",
+  upper_legs: "quads",
+  lower_legs: "calves",
+  waist: "abs",
+  cardio: "cardiovascular",
+  glutes: "glutes",
+}
+
+function detectEquipment(name: string): string {
+  const nameLower = name.toLowerCase()
+  if (nameLower.includes("dumbbell") || nameLower.includes("db ")) return "dumbbell"
+  if (nameLower.includes("barbell") || nameLower.includes("bb ")) return "barbell"
+  if (nameLower.includes("cable") || nameLower.includes("pulley")) return "cable"
+  if (nameLower.includes("machine") || nameLower.includes("press machine") || nameLower.includes("leg press")) return "machine"
+  if (nameLower.includes("kettlebell") || nameLower.includes("kb ")) return "kettlebell"
+  if (nameLower.includes("band") || nameLower.includes("resistance")) return "band"
+  if (nameLower.includes("smith")) return "smith machine"
+  if (nameLower.includes("ez bar") || nameLower.includes("ez-bar")) return "ez barbell"
+  if (nameLower.includes("pull up") || nameLower.includes("push up") || nameLower.includes("dip") || nameLower.includes("plank") || nameLower.includes("crunch") || nameLower.includes("sit up") || nameLower.includes("lunge")) return "body weight"
+  return "body weight"
+}
+
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams
   const bodyPart = searchParams.get("bodyPart") || "chest"
@@ -100,16 +127,21 @@ export async function GET(request: NextRequest) {
       })
     }
 
-    const exercises = exercisesArray.slice(0, 20).map((ex: any) => ({
-      id: ex.exerciseId || ex.id || Math.random().toString(36).substr(2, 9),
-      name: ex.name || ex.exerciseName || "Exercise",
-      nameIt: ex.name || ex.exerciseName || "Esercizio",
-      target: ex.targetMuscle || ex.target || bodyPart,
-      equipment: ex.equipmentNeeded || ex.equipment || "body weight",
-      gifUrl: ex.imageUrl || ex.gifUrl || ex.image || ex.videoUrl || `/placeholder.svg?height=200&width=200`,
-      secondaryMuscles: ex.secondaryMuscles || [],
-      instructions: ex.instructions || [],
-    }))
+    const targetMuscle = BODYPART_TARGET[bodyPart] || bodyPart
+
+    const exercises = exercisesArray.slice(0, 20).map((ex: any) => {
+      const name = ex.name || ex.exerciseName || "Exercise"
+      return {
+        id: ex.exerciseId || ex.id || Math.random().toString(36).substr(2, 9),
+        name: name,
+        nameIt: name,
+        target: ex.targetMuscle || ex.target || targetMuscle,
+        equipment: ex.equipment || ex.equipmentNeeded || detectEquipment(name),
+        gifUrl: ex.imageUrl || ex.gifUrl || ex.image || ex.videoUrl || `/placeholder.svg?height=200&width=200`,
+        secondaryMuscles: ex.secondaryMuscles || [],
+        instructions: ex.instructions || [],
+      }
+    })
 
     return NextResponse.json({
       exercises,
