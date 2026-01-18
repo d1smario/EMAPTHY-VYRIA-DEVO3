@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
 
-// Comprehensive bacteria database with scientific data
 const BACTERIA_DATABASE: Record<string, {
   referenceRange: { min: number; max: number };
   metabolicFunctions: string[];
@@ -16,8 +15,7 @@ const BACTERIA_DATABASE: Record<string, {
     toxicPotential: { level: 'low', substances: [], mechanisms: [] },
     geneticCapabilities: ['Polysaccharide utilization loci (PUL)', 'Bile salt hydrolase genes'],
     scientificEvidence: [
-      { finding: 'Bacteroides contribuisce alla degradazione di fibre complesse e produzione di SCFA', source: 'Nature Reviews Microbiology 2021', relevance: 'high' },
-      { finding: 'Associato a metabolismo sano del glucosio', source: 'Cell Host & Microbe 2020', relevance: 'high' }
+      { finding: 'Bacteroides contribuisce alla degradazione di fibre complesse e produzione di SCFA', source: 'Nature Reviews Microbiology 2021', relevance: 'high' }
     ]
   },
   'firmicutes': {
@@ -37,8 +35,7 @@ const BACTERIA_DATABASE: Record<string, {
     toxicPotential: { level: 'none', substances: [], mechanisms: [] },
     geneticCapabilities: ['Mucin-degrading enzymes', 'Outer membrane proteins'],
     scientificEvidence: [
-      { finding: 'Akkermansia muciniphila migliora la funzione metabolica e riduce infiammazione', source: 'Nature Medicine 2019', relevance: 'high' },
-      { finding: 'Associato a miglior risposta all immunoterapia', source: 'Science 2018', relevance: 'high' }
+      { finding: 'Akkermansia muciniphila migliora la funzione metabolica e riduce infiammazione', source: 'Nature Medicine 2019', relevance: 'high' }
     ]
   },
   'bifidobacterium': {
@@ -48,7 +45,7 @@ const BACTERIA_DATABASE: Record<string, {
     toxicPotential: { level: 'none', substances: [], mechanisms: [] },
     geneticCapabilities: ['Fructose-6-phosphate phosphoketolase', 'Folate synthesis genes'],
     scientificEvidence: [
-      { finding: 'Bifidobacterium supporta l immunita intestinale e riduce patogeni', source: 'Gut Microbes 2021', relevance: 'high' }
+      { finding: 'Bifidobacterium supporta immunita intestinale e riduce patogeni', source: 'Gut Microbes 2021', relevance: 'high' }
     ]
   },
   'lactobacillus': {
@@ -163,7 +160,6 @@ const BACTERIA_DATABASE: Record<string, {
   }
 };
 
-// Nutrition recommendations database
 const NUTRITION_DATABASE = {
   foodsToEliminate: [
     { food: 'Zuccheri raffinati', reason: 'Promuovono crescita batteri patogeni e Candida', relatedBacteria: ['Enterobacteriaceae', 'Candida'], duration: '4-6 settimane', priority: 'high' as const },
@@ -198,7 +194,6 @@ const NUTRITION_DATABASE = {
   ]
 };
 
-// Local parser function
 function parseLocalMicrobiomeData(rawData: string) {
   const lines = rawData.toLowerCase().split(/[\n,;]/);
   const bacteria: any[] = [];
@@ -344,7 +339,6 @@ function parseLocalMicrobiomeData(rawData: string) {
   };
 }
 
-// Local pathway analysis
 function analyzePathwaysLocal(bacteriaData: any) {
   const bacteria = bacteriaData.bacteria || [];
   
@@ -383,146 +377,4 @@ function analyzePathwaysLocal(bacteriaData: any) {
       name: 'Ammoniaca',
       producedBy: ammoniaProducers.map((b: any) => b.name),
       healthRisk: 'Neurotossico, danneggia barriera intestinale',
-      detoxStrategy: 'Ridurre proteine in eccesso, aumentare fibre fermentabili'
-    });
-  }
-  
-  return {
-    scfaProduction: {
-      butyrate: { 
-        level: Math.min(butyrateLevel * 3, 100), 
-        status: butyrateLevel > 10 ? 'Ottimale' : butyrateLevel > 5 ? 'Adeguato' : 'Basso - aumentare fibre'
-      },
-      propionate: { 
-        level: Math.min(propionateLevel * 2, 100), 
-        status: propionateLevel > 15 ? 'Ottimale' : propionateLevel > 8 ? 'Adeguato' : 'Basso'
-      },
-      acetate: { 
-        level: Math.min(acetateLevel * 4, 100), 
-        status: acetateLevel > 5 ? 'Ottimale' : 'Basso - aumentare prebiotici'
-      }
-    },
-    toxicMetabolites,
-    vitaminSynthesis: {
-      b12: { capacity: bacteria.some((b: any) => b.name.includes('Lactobacillus')) ? 'Presente' : 'Limitata', recommendation: 'Verificare livelli ematici' },
-      k2: { capacity: bacteria.some((b: any) => b.name.includes('Bacteroides')) ? 'Adeguata' : 'Limitata', recommendation: 'Considerare supplementazione se bassa' },
-      folate: { capacity: bacteria.some((b: any) => b.name.includes('Bifidobacterium')) ? 'Buona' : 'Limitata', recommendation: 'Aumentare verdure a foglia verde' },
-      biotin: { capacity: 'Presente', recommendation: 'Generalmente adeguata' }
-    },
-    activePathways: [
-      {
-        name: 'Produzione Butirrato',
-        status: butyrateLevel > 10 ? 'active' : butyrateLevel > 5 ? 'normal' : 'reduced',
-        bacteriaInvolved: butyrateProducers.map((b: any) => b.name),
-        metabolites: ['Butirrato', 'Acetil-CoA'],
-        healthImplication: 'Energia per colonociti, anti-infiammatorio, supporto barriera',
-        intervention: butyrateLevel < 10 ? 'Aumentare fibre fermentabili (legumi, avena, banana verde)' : 'Mantenere intake attuale di fibre'
-      },
-      {
-        name: 'Degradazione Mucina',
-        status: bacteria.some((b: any) => b.name.includes('Akkermansia')) ? 'active' : 'reduced',
-        bacteriaInvolved: ['Akkermansia muciniphila'],
-        metabolites: ['Propionato', 'Acetato'],
-        healthImplication: 'Rinnovamento strato mucoso, supporto barriera',
-        intervention: 'Polifenoli (frutti di bosco, te verde) promuovono Akkermansia'
-      }
-    ]
-  };
-}
-
-// Local recommendations generator
-function generateRecommendationsLocal(bacteriaData: any, pathwayData: any) {
-  const bacteria = bacteriaData.bacteria || [];
-  
-  const foodsToEliminate = [];
-  const highPathogenic = bacteria.filter((b: any) => b.toxicPotential?.level === 'high' && b.status === 'high');
-  
-  if (highPathogenic.length > 0) {
-    foodsToEliminate.push(...NUTRITION_DATABASE.foodsToEliminate.slice(0, 3));
-  } else {
-    foodsToEliminate.push(NUTRITION_DATABASE.foodsToEliminate[0]);
-  }
-  
-  const foodsToIntroduce = [...NUTRITION_DATABASE.foodsToIntroduce];
-  const supplementsRecommended = [...NUTRITION_DATABASE.supplements];
-  const probioticsRecommended = [...NUTRITION_DATABASE.probiotics];
-  
-  const lowBifidobacterium = bacteria.find((b: any) => b.name.includes('Bifidobacterium') && b.status === 'low');
-  if (lowBifidobacterium) {
-    probioticsRecommended.unshift({
-      strain: 'Bifidobacterium bifidum',
-      cfu: '10 miliardi CFU',
-      benefit: 'Ripristino popolazione Bifidobacterium',
-      timing: 'A stomaco vuoto mattina'
-    });
-  }
-  
-  return {
-    foodsToEliminate,
-    foodsToIntroduce,
-    foodsToModerate: [
-      { food: 'Carne rossa', currentIssue: 'Promuove batteri produttori di TMAO', recommendation: 'Max 2 volte/settimana', targetQuantity: '100-150g per porzione' },
-      { food: 'Latticini', currentIssue: 'Possibile sensibilita individuale', recommendation: 'Preferire fermentati (kefir, yogurt)', targetQuantity: '1-2 porzioni/giorno' }
-    ],
-    supplementsRecommended,
-    probioticsRecommended,
-    prebioticsRecommended: NUTRITION_DATABASE.prebiotics,
-    dietaryPatterns: [
-      { pattern: 'Dieta Mediterranea', description: 'Alta in fibre, polifenoli, grassi sani', rationale: 'Supporta diversita microbica e batteri benefici' },
-      { pattern: 'Time-Restricted Eating', description: 'Finestra alimentare 8-10 ore', rationale: 'Permette riposo intestinale e rigenerazione mucosa' }
-    ],
-    timingRecommendations: [
-      { meal: 'Colazione', recommendation: 'Includere fibre (avena) e probiotici (kefir)', reason: 'Attiva metabolismo microbico mattutino' },
-      { meal: 'Pre-allenamento', recommendation: 'Evitare fibre eccessive', reason: 'Ridurre fermentazione durante esercizio' },
-      { meal: 'Post-allenamento', recommendation: 'Proteine + carboidrati + polifenoli', reason: 'Recupero muscolare e supporto microbiota' },
-      { meal: 'Cena', recommendation: 'Verdure abbondanti, proteine moderate', reason: 'Fibre per fermentazione notturna' }
-    ]
-  };
-}
-
-export async function POST(req: Request) {
-  try {
-    const { rawData, analysisType } = await req.json();
-
-    if (analysisType === 'parse') {
-      const localResult = parseLocalMicrobiomeData(rawData);
-      return NextResponse.json({ 
-        success: true, 
-        type: 'bacteria_analysis',
-        data: localResult,
-        source: 'local_parser'
-      });
-    }
-    
-    if (analysisType === 'pathways') {
-      const bacteriaData = typeof rawData === 'string' ? JSON.parse(rawData) : rawData;
-      const pathwayResult = analyzePathwaysLocal(bacteriaData);
-      return NextResponse.json({ 
-        success: true, 
-        type: 'pathway_analysis',
-        data: pathwayResult,
-        source: 'local_parser'
-      });
-    }
-    
-    if (analysisType === 'recommendations') {
-      const inputData = typeof rawData === 'string' ? JSON.parse(rawData) : rawData;
-      const recommendations = generateRecommendationsLocal(inputData.bacteria || inputData, inputData.pathways);
-      return NextResponse.json({ 
-        success: true, 
-        type: 'recommendations',
-        data: recommendations,
-        source: 'local_parser'
-      });
-    }
-
-    return NextResponse.json({ error: 'Invalid analysis type' }, { status: 400 });
-    
-  } catch (error) {
-    console.error('[Microbiome API] Error:', error);
-    return NextResponse.json({ 
-      error: 'Analysis failed',
-      details: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 });
-  }
-}
+      detoxStrategy: 'Ridurre proteine in eccesso, aumentare 
