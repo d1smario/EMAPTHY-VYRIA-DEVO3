@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -18,6 +18,7 @@ import {
   Dna,
   BarChart3,
   Smartphone,
+  Flower2,
 } from "lucide-react"
 import { AthleteProfile } from "@/components/athlete-profile"
 import WeeklyTraining from "@/components/weekly-training"
@@ -33,6 +34,7 @@ import DailyTrainingReport from "@/components/daily-training-report"
 import { MicrobiomeEpigenetic } from "@/components/microbiome-epigenetic"
 import { ActivityDashboard } from "@/components/activity-dashboard"
 import { IntegrationsPanel } from "@/components/integrations-panel"
+import LifestyleSection from "@/components/lifestyle-section"
 import type { User as SupabaseUser } from "@supabase/supabase-js"
 
 export interface AthleteDataType {
@@ -124,8 +126,17 @@ export function DashboardContent({
   weeklyWorkouts,
 }: DashboardContentProps) {
   const [activeTab, setActiveTab] = useState("profile")
+  const [isScrolled, setIsScrolled] = useState(false)
   const router = useRouter()
   const supabase = createClient()
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setIsScrolled(window.scrollY > 50)
+    }
+    window.addEventListener("scroll", handleScroll)
+    return () => window.removeEventListener("scroll", handleScroll)
+  }, [])
 
   const handleLogout = async () => {
     if (supabase) {
@@ -140,7 +151,7 @@ export function DashboardContent({
   return (
     <BioMapProvider>
       <div className="min-h-screen bg-background text-foreground flex flex-col">
-        <header className="border-b bg-card sticky top-0 z-10 print:hidden">
+        <header className="border-b bg-card print:hidden">
           <div className="container mx-auto py-4 px-4 md:px-8 flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="h-8 w-8 bg-fuchsia-600 rounded-md flex items-center justify-center text-white font-bold text-lg">
@@ -182,7 +193,7 @@ export function DashboardContent({
 
               <Tabs defaultValue="profile" className="space-y-6" onValueChange={setActiveTab}>
                 <div className="flex items-center justify-between overflow-x-auto pb-2 print:hidden">
-                  <TabsList className="grid w-full grid-cols-10 lg:w-[1200px]">
+                  <TabsList className="flex flex-wrap gap-1 w-full h-auto p-1">
                     <TabsTrigger value="profile" className="flex items-center gap-2">
                       <User className="h-4 w-4" />
                       <span className="hidden sm:inline">Profilo</span>
@@ -202,6 +213,10 @@ export function DashboardContent({
                     <TabsTrigger value="training" className="flex items-center gap-2">
                       <CalendarDays className="h-4 w-4" />
                       <span className="hidden sm:inline">Training</span>
+                    </TabsTrigger>
+                    <TabsTrigger value="lifestyle" className="flex items-center gap-2">
+                      <Flower2 className="h-4 w-4" />
+                      <span className="hidden sm:inline">Lifestyle</span>
                     </TabsTrigger>
                     <TabsTrigger value="nutrition" className="flex items-center gap-2">
                       <Calculator className="h-4 w-4" />
@@ -244,6 +259,10 @@ export function DashboardContent({
 
                 <TabsContent value="training" className="space-y-4 focus-visible:outline-none focus-visible:ring-0">
                   <WeeklyTraining athleteData={athleteData} userName={profile?.full_name} workouts={weeklyWorkouts} />
+                </TabsContent>
+
+                <TabsContent value="lifestyle" className="space-y-4 focus-visible:outline-none focus-visible:ring-0">
+                  <LifestyleSection athleteData={athleteData} userName={profile?.full_name} />
                 </TabsContent>
 
                 <TabsContent value="nutrition" className="space-y-4 focus-visible:outline-none focus-visible:ring-0">
