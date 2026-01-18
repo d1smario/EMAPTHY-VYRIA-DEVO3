@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 
+// Comprehensive bacteria database with scientific data
 const BACTERIA_DATABASE: Record<string, {
   referenceRange: { min: number; max: number };
   metabolicFunctions: string[];
@@ -15,7 +16,8 @@ const BACTERIA_DATABASE: Record<string, {
     toxicPotential: { level: 'low', substances: [], mechanisms: [] },
     geneticCapabilities: ['Polysaccharide utilization loci (PUL)', 'Bile salt hydrolase genes'],
     scientificEvidence: [
-      { finding: 'Bacteroides contribuisce alla degradazione di fibre complesse e produzione di SCFA', source: 'Nature Reviews Microbiology 2021', relevance: 'high' }
+      { finding: 'Bacteroides contribuisce alla degradazione di fibre complesse e produzione di SCFA', source: 'Nature Reviews Microbiology 2021', relevance: 'high' },
+      { finding: 'Associato a metabolismo sano del glucosio', source: 'Cell Host & Microbe 2020', relevance: 'high' }
     ]
   },
   'firmicutes': {
@@ -35,7 +37,8 @@ const BACTERIA_DATABASE: Record<string, {
     toxicPotential: { level: 'none', substances: [], mechanisms: [] },
     geneticCapabilities: ['Mucin-degrading enzymes', 'Outer membrane proteins'],
     scientificEvidence: [
-      { finding: 'Akkermansia muciniphila migliora la funzione metabolica e riduce infiammazione', source: 'Nature Medicine 2019', relevance: 'high' }
+      { finding: 'Akkermansia muciniphila migliora la funzione metabolica e riduce infiammazione', source: 'Nature Medicine 2019', relevance: 'high' },
+      { finding: 'Associato a miglior risposta all immunoterapia', source: 'Science 2018', relevance: 'high' }
     ]
   },
   'bifidobacterium': {
@@ -45,7 +48,7 @@ const BACTERIA_DATABASE: Record<string, {
     toxicPotential: { level: 'none', substances: [], mechanisms: [] },
     geneticCapabilities: ['Fructose-6-phosphate phosphoketolase', 'Folate synthesis genes'],
     scientificEvidence: [
-      { finding: 'Bifidobacterium supporta immunita intestinale e riduce patogeni', source: 'Gut Microbes 2021', relevance: 'high' }
+      { finding: 'Bifidobacterium supporta l immunita intestinale e riduce patogeni', source: 'Gut Microbes 2021', relevance: 'high' }
     ]
   },
   'lactobacillus': {
@@ -160,6 +163,7 @@ const BACTERIA_DATABASE: Record<string, {
   }
 };
 
+// Nutrition recommendations database
 const NUTRITION_DATABASE = {
   foodsToEliminate: [
     { food: 'Zuccheri raffinati', reason: 'Promuovono crescita batteri patogeni e Candida', relatedBacteria: ['Enterobacteriaceae', 'Candida'], duration: '4-6 settimane', priority: 'high' as const },
@@ -194,11 +198,13 @@ const NUTRITION_DATABASE = {
   ]
 };
 
+// Local parser function
 function parseLocalMicrobiomeData(rawData: string) {
   const lines = rawData.toLowerCase().split(/[\n,;]/);
   const bacteria: any[] = [];
   let totalAbundance = 0;
   
+  // Common bacteria patterns to search for
   const bacteriaPatterns = [
     { pattern: /bacteroides/i, name: 'Bacteroides' },
     { pattern: /firmicutes/i, name: 'Firmicutes' },
@@ -223,16 +229,20 @@ function parseLocalMicrobiomeData(rawData: string) {
   for (const line of lines) {
     for (const { pattern, name } of bacteriaPatterns) {
       if (pattern.test(line)) {
+        // Extract percentage
         const percentMatch = line.match(/(\d+(?:\.\d+)?)\s*%?/);
         const abundance = percentMatch ? parseFloat(percentMatch[1]) : Math.random() * 10 + 1;
         
+        // Get database info
         const dbKey = name.toLowerCase().split(' ')[0];
         const dbInfo = BACTERIA_DATABASE[dbKey] || BACTERIA_DATABASE['bacteroides'];
         
+        // Determine status
         let status: 'low' | 'normal' | 'high' = 'normal';
         if (abundance < dbInfo.referenceRange.min) status = 'low';
         else if (abundance > dbInfo.referenceRange.max) status = 'high';
         
+        // Avoid duplicates
         if (!bacteria.find(b => b.name === name)) {
           bacteria.push({
             name,
@@ -252,7 +262,9 @@ function parseLocalMicrobiomeData(rawData: string) {
     }
   }
   
+  // If no bacteria found, add some defaults based on common patterns
   if (bacteria.length === 0) {
+    // Try to parse any numbers with names
     const genericPattern = /([a-z]+)\s*[:\-]?\s*(\d+(?:\.\d+)?)\s*%?/gi;
     let match;
     while ((match = genericPattern.exec(rawData)) !== null) {
@@ -282,10 +294,12 @@ function parseLocalMicrobiomeData(rawData: string) {
     }
   }
   
+  // Calculate indices
   const firmicutes = bacteria.find(b => b.name.toLowerCase().includes('firmicutes'))?.abundance || 45;
   const bacteroidesVal = bacteria.find(b => b.name.toLowerCase().includes('bacteroides'))?.abundance || 30;
   const fbRatio = bacteroidesVal > 0 ? firmicutes / bacteroidesVal : 1.5;
   
+  // Shannon diversity index (simplified)
   const diversityIndex = bacteria.length > 0 
     ? -bacteria.reduce((sum, b) => {
         const p = b.abundance / (totalAbundance || 100);
@@ -293,6 +307,7 @@ function parseLocalMicrobiomeData(rawData: string) {
       }, 0)
     : 2.5;
   
+  // Determine overall health
   let overallHealth: 'optimal' | 'good' | 'suboptimal' | 'compromised' = 'good';
   const lowBeneficial = bacteria.filter(b => 
     ['Bifidobacterium', 'Lactobacillus', 'Faecalibacterium prausnitzii', 'Akkermansia muciniphila'].some(n => b.name.includes(n)) && b.status === 'low'
@@ -305,6 +320,7 @@ function parseLocalMicrobiomeData(rawData: string) {
   else if (lowBeneficial > 2 || highPathogenic > 1) overallHealth = 'suboptimal';
   else if (lowBeneficial > 3 || highPathogenic > 2) overallHealth = 'compromised';
   
+  // Generate findings
   const keyFindings: string[] = [];
   const riskFactors: string[] = [];
   
@@ -339,9 +355,11 @@ function parseLocalMicrobiomeData(rawData: string) {
   };
 }
 
+// Local pathway analysis
 function analyzePathwaysLocal(bacteriaData: any) {
   const bacteria = bacteriaData.bacteria || [];
   
+  // SCFA production based on bacteria present
   const butyrateProducers = bacteria.filter((b: any) => 
     ['Faecalibacterium', 'Roseburia', 'Eubacterium', 'Clostridium'].some(n => b.name.includes(n))
   );
@@ -356,6 +374,7 @@ function analyzePathwaysLocal(bacteriaData: any) {
   const propionateLevel = propionateProducers.reduce((sum: number, b: any) => sum + (b.abundance || 0), 0);
   const acetateLevel = acetateProducers.reduce((sum: number, b: any) => sum + (b.abundance || 0), 0);
   
+  // Toxic metabolites
   const toxicMetabolites: any[] = [];
   const h2sProducers = bacteria.filter((b: any) => 
     ['Desulfovibrio', 'Bilophila'].some(n => b.name.includes(n)) && b.status === 'high'
@@ -424,23 +443,31 @@ function analyzePathwaysLocal(bacteriaData: any) {
   };
 }
 
-function generateRecommendationsLocal(bacteriaData: any) {
+// Local recommendations generator
+function generateRecommendationsLocal(bacteriaData: any, pathwayData: any) {
   const bacteria = bacteriaData.bacteria || [];
   
+  // Determine which foods to eliminate based on bacteria profile
   const foodsToEliminate = [];
   const highPathogenic = bacteria.filter((b: any) => b.toxicPotential?.level === 'high' && b.status === 'high');
   
   if (highPathogenic.length > 0) {
     foodsToEliminate.push(...NUTRITION_DATABASE.foodsToEliminate.slice(0, 3));
   } else {
-    foodsToEliminate.push(NUTRITION_DATABASE.foodsToEliminate[0]);
+    foodsToEliminate.push(NUTRITION_DATABASE.foodsToEliminate[0]); // Always reduce sugar
   }
   
+  // Foods to introduce based on deficiencies
   const foodsToIntroduce = [...NUTRITION_DATABASE.foodsToIntroduce];
-  const supplementsRecommended = [...NUTRITION_DATABASE.supplements];
-  const probioticsRecommended = [...NUTRITION_DATABASE.probiotics];
   
   const lowBifidobacterium = bacteria.find((b: any) => b.name.includes('Bifidobacterium') && b.status === 'low');
+  const lowAkkermansia = bacteria.find((b: any) => b.name.includes('Akkermansia') && b.status === 'low');
+  
+  // Supplements based on analysis
+  const supplementsRecommended = [...NUTRITION_DATABASE.supplements];
+  
+  // Probiotics based on deficiencies
+  const probioticsRecommended = [...NUTRITION_DATABASE.probiotics];
   if (lowBifidobacterium) {
     probioticsRecommended.unshift({
       strain: 'Bifidobacterium bifidum',
@@ -473,49 +500,280 @@ function generateRecommendationsLocal(bacteriaData: any) {
   };
 }
 
+// Schema for bacteria analysis
+const bacteriaAnalysisSchema = z.object({
+  bacteria: z.array(z.object({
+    name: z.string().describe('Nome del batterio'),
+    abundance: z.number().describe('Percentuale di abbondanza'),
+    status: z.enum(['low', 'normal', 'high']).describe('Status rispetto ai range normali'),
+    referenceRange: z.object({
+      min: z.number(),
+      max: z.number()
+    }),
+    metabolicFunctions: z.array(z.string()).describe('Funzioni metaboliche principali'),
+    pathways: z.array(z.string()).describe('Pathway metabolici coinvolti'),
+    toxicPotential: z.object({
+      level: z.enum(['none', 'low', 'moderate', 'high']),
+      substances: z.array(z.string()).describe('Sostanze tossiche potenzialmente prodotte'),
+      mechanisms: z.array(z.string())
+    }),
+    geneticCapabilities: z.array(z.string()).describe('Capacita genetiche del batterio'),
+    scientificEvidence: z.array(z.object({
+      finding: z.string(),
+      source: z.string(),
+      relevance: z.enum(['high', 'medium', 'low'])
+    })).describe('Evidenze scientifiche rilevanti')
+  })),
+  diversityIndex: z.number().describe('Indice di diversita Shannon'),
+  firmicutesBacteroidetesRatio: z.number(),
+  overallHealth: z.enum(['optimal', 'good', 'suboptimal', 'compromised']),
+  keyFindings: z.array(z.string()),
+  riskFactors: z.array(z.string())
+});
+
+// Schema for nutrition recommendations
+const nutritionRecommendationsSchema = z.object({
+  foodsToEliminate: z.array(z.object({
+    food: z.string(),
+    reason: z.string(),
+    relatedBacteria: z.array(z.string()),
+    duration: z.string().describe('Per quanto tempo eliminare'),
+    priority: z.enum(['high', 'medium', 'low'])
+  })),
+  foodsToIntroduce: z.array(z.object({
+    food: z.string(),
+    benefit: z.string(),
+    targetBacteria: z.array(z.string()),
+    timing: z.string().describe('Quando assumere'),
+    frequency: z.string(),
+    priority: z.enum(['high', 'medium', 'low'])
+  })),
+  foodsToModerate: z.array(z.object({
+    food: z.string(),
+    currentIssue: z.string(),
+    recommendation: z.string(),
+    targetQuantity: z.string()
+  })),
+  supplementsRecommended: z.array(z.object({
+    name: z.string(),
+    dose: z.string(),
+    timing: z.string(),
+    duration: z.string(),
+    reason: z.string(),
+    scientificBasis: z.string(),
+    priority: z.enum(['essential', 'recommended', 'optional'])
+  })),
+  probioticsRecommended: z.array(z.object({
+    strain: z.string(),
+    cfu: z.string().describe('Colony forming units'),
+    benefit: z.string(),
+    timing: z.string()
+  })),
+  prebioticsRecommended: z.array(z.object({
+    type: z.string(),
+    source: z.string(),
+    benefit: z.string(),
+    dose: z.string()
+  })),
+  dietaryPatterns: z.array(z.object({
+    pattern: z.string(),
+    description: z.string(),
+    rationale: z.string()
+  })),
+  timingRecommendations: z.array(z.object({
+    meal: z.string(),
+    recommendation: z.string(),
+    reason: z.string()
+  }))
+});
+
+// Schema for pathway analysis
+const pathwayAnalysisSchema = z.object({
+  activePathways: z.array(z.object({
+    name: z.string(),
+    status: z.enum(['hyperactive', 'active', 'normal', 'reduced', 'inactive']),
+    bacteriaInvolved: z.array(z.string()),
+    metabolites: z.array(z.string()),
+    healthImplication: z.string(),
+    intervention: z.string()
+  })),
+  scfaProduction: z.object({
+    butyrate: z.object({ level: z.number(), status: z.string() }),
+    propionate: z.object({ level: z.number(), status: z.string() }),
+    acetate: z.object({ level: z.number(), status: z.string() }),
+    overall: z.string()
+  }),
+  toxicMetabolites: z.array(z.object({
+    name: z.string(),
+    producedBy: z.array(z.string()),
+    healthRisk: z.string(),
+    detoxStrategy: z.string()
+  })),
+  vitaminSynthesis: z.object({
+    b12: z.object({ capacity: z.string(), recommendation: z.string() }),
+    k2: z.object({ capacity: z.string(), recommendation: z.string() }),
+    folate: z.object({ capacity: z.string(), recommendation: z.string() }),
+    biotin: z.object({ capacity: z.string(), recommendation: z.string() })
+  })
+});
+
 export async function POST(req: Request) {
   try {
-    const { rawData, analysisType } = await req.json();
+    const { rawData, analysisType, currentNutrition } = await req.json();
+    
+    console.log('[Microbiome API] Received request:', { analysisType, dataLength: rawData?.length });
 
+    // Use local parser if AI Gateway is not available
+    if (!USE_AI_GATEWAY) {
+      console.log('[Microbiome API] Using local parser (AI Gateway disabled)');
+      
+      if (analysisType === 'parse') {
+        const localResult = parseLocalMicrobiomeData(rawData);
+        return Response.json({ 
+          success: true, 
+          type: 'bacteria_analysis',
+          data: localResult,
+          source: 'local_parser'
+        });
+      }
+      
+      if (analysisType === 'pathways') {
+        const bacteriaData = typeof rawData === 'string' ? JSON.parse(rawData) : rawData;
+        const pathwayResult = analyzePathwaysLocal(bacteriaData);
+        return Response.json({ 
+          success: true, 
+          type: 'pathway_analysis',
+          data: pathwayResult,
+          source: 'local_parser'
+        });
+      }
+      
+      if (analysisType === 'recommendations') {
+        const inputData = typeof rawData === 'string' ? JSON.parse(rawData) : rawData;
+        const recommendations = generateRecommendationsLocal(inputData.bacteria || inputData, inputData.pathways);
+        return Response.json({ 
+          success: true, 
+          type: 'recommendations',
+          data: recommendations,
+          source: 'local_parser'
+        });
+      }
+    }
+
+    // AI Gateway path (requires credit card)
     if (analysisType === 'parse') {
-      const localResult = parseLocalMicrobiomeData(rawData);
-      return NextResponse.json({ 
+      // Parse raw microbiome data and analyze bacteria
+      const { object: bacteriaAnalysis } = await generateObject({
+        model: 'anthropic/claude-sonnet-4-20250514',
+        schema: bacteriaAnalysisSchema,
+        messages: [
+          {
+            role: 'system',
+            content: `Sei un esperto di microbiologia e genomica del microbiota intestinale. Analizza i dati del test del microbioma forniti e:
+1. Identifica tutti i batteri presenti con le loro abbondanze
+2. Valuta lo stato di ogni batterio rispetto ai range di riferimento scientifici
+3. Identifica le capacita genetiche di ogni batterio (geni per produzione SCFA, degradazione di fibre, produzione di vitamine, etc)
+4. Identifica i pathway metabolici attivi
+5. Valuta il potenziale di produzione di sostanze tossiche (H2S, TMA, TMAO, ammoniaca, etc)
+6. Cerca evidenze scientifiche recenti su Nature, Cell, Gut, e altri journal di alto impatto
+7. Calcola l'indice di diversita Shannon e il ratio Firmicutes/Bacteroidetes
+8. Identifica fattori di rischio basati sul profilo batterico
+
+Sii preciso e basa le tue analisi su evidenze scientifiche recenti.`
+          },
+          {
+            role: 'user',
+            content: `Analizza questi dati del test del microbioma:\n\n${rawData}`
+          }
+        ],
+        maxOutputTokens: 8000,
+        temperature: 0.3
+      });
+
+      return Response.json({ 
         success: true, 
         type: 'bacteria_analysis',
-        data: localResult,
-        source: 'local_parser'
-      });
-    }
-    
-    if (analysisType === 'pathways') {
-      const bacteriaData = typeof rawData === 'string' ? JSON.parse(rawData) : rawData;
-      const pathwayResult = analyzePathwaysLocal(bacteriaData);
-      return NextResponse.json({ 
-        success: true, 
-        type: 'pathway_analysis',
-        data: pathwayResult,
-        source: 'local_parser'
-      });
-    }
-    
-    if (analysisType === 'recommendations') {
-      const inputData = typeof rawData === 'string' ? JSON.parse(rawData) : rawData;
-      const recommendations = generateRecommendationsLocal(inputData.bacteria || inputData);
-      return NextResponse.json({ 
-        success: true, 
-        type: 'recommendations',
-        data: recommendations,
-        source: 'local_parser'
+        data: bacteriaAnalysis 
       });
     }
 
-    return NextResponse.json({ error: 'Invalid analysis type' }, { status: 400 });
-    
+    if (analysisType === 'pathways') {
+      // Analyze metabolic pathways
+      const { object: pathwayAnalysis } = await generateObject({
+        model: 'anthropic/claude-sonnet-4-20250514',
+        schema: pathwayAnalysisSchema,
+        messages: [
+          {
+            role: 'system',
+            content: `Sei un esperto di metabolomica e pathway analysis del microbiota. Analizza i batteri identificati e:
+1. Identifica tutti i pathway metabolici attivi
+2. Valuta la produzione di SCFA (butirrato, propionato, acetato)
+3. Identifica metaboliti tossici potenzialmente prodotti
+4. Valuta la capacita di sintesi vitaminica
+5. Suggerisci interventi per ottimizzare i pathway`
+          },
+          {
+            role: 'user',
+            content: `Analizza i pathway metabolici basandoti su questi batteri:\n\n${rawData}`
+          }
+        ],
+        maxOutputTokens: 6000,
+        temperature: 0.3
+      });
+
+      return Response.json({ 
+        success: true, 
+        type: 'pathway_analysis',
+        data: pathwayAnalysis 
+      });
+    }
+
+    if (analysisType === 'recommendations') {
+      // Generate nutrition recommendations
+      const { object: recommendations } = await generateObject({
+        model: 'anthropic/claude-sonnet-4-20250514',
+        schema: nutritionRecommendationsSchema,
+        messages: [
+          {
+            role: 'system',
+            content: `Sei un esperto nutrizionista funzionale specializzato in modulazione del microbiota per atleti. 
+Basandoti sull'analisi del microbioma e sulla dieta attuale dell'atleta:
+
+1. ALIMENTI DA ELIMINARE: Identifica alimenti che potrebbero nutrire batteri patogeni, aumentare infiammazione, o produrre metaboliti tossici
+2. ALIMENTI DA INTRODURRE: Suggerisci alimenti che promuovono batteri benefici, producono SCFA, migliorano la barriera intestinale
+3. ALIMENTI DA MODERARE: Identifica alimenti che non vanno eliminati ma ridotti
+4. SUPPLEMENTI: Raccomanda supplementi con evidenza scientifica per migliorare il profilo microbiotico
+5. PROBIOTICI: Suggerisci ceppi specifici con CFU e timing
+6. PREBIOTICI: Identifica fibre e composti prebiotici utili
+7. PATTERN DIETETICI: Suggerisci modifiche allo stile alimentare
+8. TIMING: Ottimizza quando consumare certi alimenti per massimo beneficio
+
+Considera che e un atleta, quindi le raccomandazioni devono supportare anche la performance sportiva.
+Basa tutto su evidenze scientifiche recenti.`
+          },
+          {
+            role: 'user',
+            content: `Analisi microbioma:\n${rawData}\n\nDieta attuale dell'atleta:\n${currentNutrition || 'Non specificata'}`
+          }
+        ],
+        maxOutputTokens: 8000,
+        temperature: 0.4
+      });
+
+      return Response.json({ 
+        success: true, 
+        type: 'recommendations',
+        data: recommendations 
+      });
+    }
+
+    return Response.json({ error: 'Invalid analysis type' }, { status: 400 });
+
   } catch (error) {
-    console.error('[Microbiome API] Error:', error);
-    return NextResponse.json({ 
-      error: 'Analysis failed',
-      details: error instanceof Error ? error.message : 'Unknown error'
+    console.error('Microbiome analysis error:', error);
+    return Response.json({ 
+      error: 'Analysis failed', 
+      details: error instanceof Error ? error.message : 'Unknown error' 
     }, { status: 500 });
   }
 }
