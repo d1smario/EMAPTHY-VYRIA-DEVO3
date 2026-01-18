@@ -26,6 +26,8 @@ interface TrainingActivity {
   parsedBlocks?: any[]
   planned?: boolean
   completed?: boolean
+  parsedGymSession?: any
+  parsedExercises?: any[]
 }
 
 interface GymExercise {
@@ -580,7 +582,7 @@ export function DailyTrainingReport({ athleteId, athleteName }: DailyTrainingRep
               const parsed = typeof gym.intervals === "string" ? JSON.parse(gym.intervals) : gym.intervals
               console.log("[v0] Parsed gym intervals:", parsed)
               gym.parsedGymSession = parsed.gym_session || parsed
-              gym.parsedExercises = parsed.exercises || parsed.gym_session?.exercises || []
+              gym.parsedExercises = parsed.gymExercises || parsed.exercises || parsed.gym_session?.exercises || []
             } catch (e) {
               console.error("[v0] Error parsing gym intervals:", e)
             }
@@ -617,17 +619,24 @@ export function DailyTrainingReport({ athleteId, athleteName }: DailyTrainingRep
 
   const rawGymExercises = gymWorkout?.parsedExercises || []
   const gymExercises = rawGymExercises.map((ex: any) => {
-    // Try to find exercise in database
-    const dbExercise = ex.exercise?.id ? EXERCISE_DATABASE[ex.exercise.id] : null
+    // Map to expected structure for rendering
     return {
       ...ex,
       exercise: {
-        ...ex.exercise,
+        id: ex.id,
+        name: ex.nameIt || ex.name || "Esercizio",
+        equipment: ex.equipment || "corpo libero",
         image_url:
-          dbExercise?.image ||
-          ex.exercise?.image_url ||
-          `/placeholder.svg?height=120&width=120&query=${encodeURIComponent(ex.exercise?.name || "exercise")}`,
+          ex.gifUrl || `/placeholder.svg?height=120&width=120&query=${encodeURIComponent(ex.name || "exercise")}`,
+        muscle_group: ex.secondaryMuscles || [ex.target] || [],
+        target: ex.target,
+        instructions: ex.instructions || [],
       },
+      sets: ex.sets || 3,
+      reps: ex.reps || 10,
+      weight: ex.weight || 0,
+      rest_seconds: ex.restSeconds || 60,
+      notes: ex.notes || "",
     }
   })
 
