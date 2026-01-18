@@ -18,9 +18,10 @@ import {
 } from "@/components/ui/dialog"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Users, UserPlus, Mail, CheckCircle2, Clock, AlertCircle, Loader2, Search, Calendar, Eye } from "lucide-react"
+import { Users, UserPlus, Mail, CheckCircle2, Clock, AlertCircle, Loader2, Search, Calendar, Eye, Flower2 } from "lucide-react"
 import type { User as SupabaseUser } from "@supabase/supabase-js"
 import { CoachTrainingPlanner } from "./coach-training-planner"
+import { CoachLifestylePlanner } from "./coach-lifestyle-planner"
 import { AthleteDetailView } from "./athlete-detail-view"
 
 interface Athlete {
@@ -380,6 +381,10 @@ export function CoachDashboard({ user, profile, linkedAthletes }: CoachDashboard
             <Calendar className="h-4 w-4 mr-2" />
             Pianifica Allenamento
           </TabsTrigger>
+          <TabsTrigger value="lifestyle" className="data-[state=active]:bg-slate-700">
+            <Flower2 className="h-4 w-4 mr-2" />
+            Lifestyle
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="athletes">
@@ -554,6 +559,25 @@ export function CoachDashboard({ user, profile, linkedAthletes }: CoachDashboard
 
         <TabsContent value="planner">
           <CoachTrainingPlanner
+            coachId={user.id}
+            linkedAthletes={athletes.map((a) => ({
+              id: a.id,
+              status: a.status,
+              athlete: a.athlete
+                ? {
+                    id: a.athlete.id,
+                    user: a.athlete.user,
+                    primary_sport: a.athlete.primary_sport,
+                    weight_kg: a.athlete.weight_kg,
+                    metabolic_profiles: a.athlete.metabolic_profiles,
+                  }
+                : null,
+            }))}
+          />
+        </TabsContent>
+
+        <TabsContent value="lifestyle">
+          <CoachLifestylePlanner
             coachId={user.id}
             linkedAthletes={athletes.map((a) => ({
               id: a.id,
