@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { Printer, Dumbbell, Bike, CalendarIcon, Clock, Flame, Zap, Target, Activity } from "lucide-react"
+import { Printer, Dumbbell, Bike, CalendarIcon, Clock, Flame, Zap, Target, Activity, Flower2 } from "lucide-react"
 import { createBrowserClient } from "@supabase/ssr"
 import { format } from "date-fns"
 import { it } from "date-fns/locale"
@@ -544,6 +544,7 @@ export function DailyTrainingReport({ athleteId, athleteName }: DailyTrainingRep
   const [selectedDate, setSelectedDate] = useState<Date>(new Date())
   const [bikeWorkout, setBikeWorkout] = useState<TrainingActivity | null>(null)
   const [gymWorkout, setGymWorkout] = useState<TrainingActivity | null>(null)
+  const [lifestyleWorkout, setLifestyleWorkout] = useState<TrainingActivity | null>(null)
   const [loading, setLoading] = useState(false)
   const printRef = useRef<HTMLDivElement>(null)
 
@@ -576,6 +577,7 @@ export function DailyTrainingReport({ athleteId, athleteName }: DailyTrainingRep
 
           const bike = data.find((w: any) => w.activity_type === "cycling" || w.activity_type === "bike")
           const gym = data.find((w: any) => w.activity_type === "gym" || w.activity_type === "strength")
+          const lifestyle = data.find((w: any) => w.sport === "lifestyle")
 
           if (gym && gym.intervals) {
             try {
@@ -598,8 +600,20 @@ export function DailyTrainingReport({ athleteId, athleteName }: DailyTrainingRep
             }
           }
 
+          if (lifestyle && lifestyle.workout_data) {
+            try {
+              const parsed = typeof lifestyle.workout_data === "string" ? JSON.parse(lifestyle.workout_data) : lifestyle.workout_data
+              lifestyle.parsedLifestyleActivities = parsed.activities || []
+              lifestyle.lifestyleCategory = parsed.category || "yoga"
+              lifestyle.lifestyleSessionName = parsed.sessionName || lifestyle.title || "Sessione Lifestyle"
+            } catch (e) {
+              console.error("Error parsing lifestyle workout_data:", e)
+            }
+          }
+
           setBikeWorkout(bike || null)
           setGymWorkout(gym || null)
+          setLifestyleWorkout(lifestyle || null)
         }
       } catch (err) {
         console.error("[v0] Exception loading workouts:", err)
@@ -644,7 +658,9 @@ export function DailyTrainingReport({ athleteId, athleteName }: DailyTrainingRep
 
   const stimulusInfo = STIMULUS_INFO[gymSettings.stimulus_type] || STIMULUS_INFO.forza
 
-  const hasWorkouts = bikeWorkout || gymWorkout
+  const lifestyleActivities = lifestyleWorkout?.parsedLifestyleActivities || []
+
+  const hasWorkouts = bikeWorkout || gymWorkout || lifestyleWorkout
 
   return (
     <div className="space-y-6">
@@ -965,6 +981,89 @@ export function DailyTrainingReport({ athleteId, athleteName }: DailyTrainingRep
                     Linee Guida - {stimulusInfo.label}
                   </h4>
                   <p className="text-sm text-muted-foreground">{stimulusInfo.description}</p>
+                </div>
+              )}
+            </section>
+          )}
+
+          {/* LIFESTYLE SECTION */}
+          {lifestyleWorkout && (
+            <section className="mt-8">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="h-10 w-10 rounded-full bg-purple-600 flex items-center justify-center">
+                  <Flower2 className="h-5 w-5 text-white" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold">
+                    {lifestyleWorkout.lifestyleSessionName || lifestyleWorkout.title || "Sessione Lifestyle"}
+                  </h3>
+                  <p className="text-sm text-muted-foreground capitalize">
+                    {lifestyleWorkout.lifestyleCategory || "Benessere"} - {lifestyleWorkout.duration_minutes || 0} minuti
+                  </p>
+                </div>
+              </div>
+
+              {lifestyleActivities.length > 0 ? (
+                <div className="space-y-4">
+                  {lifestyleActivities.map((activity: any, idx: number) => (
+                    <div
+                      key={activity.id || idx}
+                      className="flex items-stretch border rounded-xl overflow-hidden bg-card shadow-sm"
+                    >
+                      {/* Number */}
+                      <div className="flex items-center justify-center w-14 bg-gradient-to-b from-purple-500 to-purple-600 text-white text-2xl font-bold">
+                        {idx + 1}
+                      </div>
+
+                      {/* Image */}
+                      <div className="w-28 h-28 flex-shrink-0 bg-muted relative overflow-hidden">
+                        <img
+                          src={activity.imageUrl || "/placeholder.svg"}
+                          alt={activity.nameIt || activity.name || "Attivita"}
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            ;(e.target as HTMLImageElement).src =
+                              `/placeholder.svg?height=120&width=120&query=lifestyle wellness`
+                          }}
+                        />
+                      </div>
+
+                      {/* Content */}
+                      <div className="flex-1 p-4">
+                        <div className="flex items-start justify-between mb-2">
+                          <div>
+                            <h4 className="font-bold text-lg">{activity.nameIt || activity.name || "Attivita"}</h4>
+                            <p className="text-sm text-muted-foreground">
+                              {activity.duration} minuti - {activity.difficulty === "beginner" ? "Principiante" : activity.difficulty === "intermediate" ? "Intermedio" : "Avanzato"}
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Benefits */}
+                        {activity.benefits && activity.benefits.length > 0 && (
+                          <div className="flex flex-wrap gap-1 mb-3">
+                            {activity.benefits.slice(0, 4).map((b: string, i: number) => (
+                              <Badge key={i} variant="secondary" className="text-[10px] px-2 py-0">
+                                {b}
+                              </Badge>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* Instructions preview */}
+                        {activity.instructions && activity.instructions.length > 0 && (
+                          <p className="text-xs text-muted-foreground italic line-clamp-2">
+                            {activity.instructions[0]}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8 text-muted-foreground bg-muted/30 rounded-lg">
+                  <Flower2 className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                  <p>Nessuna attivita configurata per questa sessione</p>
                 </div>
               )}
             </section>
