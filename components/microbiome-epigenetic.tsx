@@ -459,6 +459,19 @@ export function MicrobiomeEpigenetic({ athleteId, metabolicProfile, trainingDay 
   // Generated recommendations
   const [foodBacteriaProtocol, setFoodBacteriaProtocol] = useState<FoodBacteriaMapping[]>([])
   const [metabolicTargets, setMetabolicTargets] = useState<MetabolicTarget[]>([])
+  
+  // AI Analysis states
+  const [aiAnalysisResults, setAiAnalysisResults] = useState<any>(null)
+  const [aiRecommendations, setAiRecommendations] = useState<any>(null)
+  const [aiPathways, setAiPathways] = useState<any>(null)
+  const [isAiAnalyzing, setIsAiAnalyzing] = useState(false)
+  const [aiAnalysisStep, setAiAnalysisStep] = useState<string>("")
+  
+  // History and comparison states
+  const [historicalReports, setHistoricalReports] = useState<any[]>([])
+  const [selectedReportsForComparison, setSelectedReportsForComparison] = useState<string[]>([])
+  const [comparisonData, setComparisonData] = useState<any>(null)
+  const [showComparisonDialog, setShowComparisonDialog] = useState(false)
 
   const [selectedDay, setSelectedDay] = useState<number>(() => new Date().getDay() || 7)
   const [weekWorkouts, setWeekWorkouts] = useState<any[]>([])
@@ -553,27 +566,173 @@ export function MicrobiomeEpigenetic({ athleteId, metabolicProfile, trainingDay 
 
   const selectedDayLabel = DAYS.find((d) => d.value === selectedDay)?.fullLabel || ""
 
+  // State for PDF error message
+  const [pdfParseError, setPdfParseError] = useState<string | null>(null)
+
   // Handle file upload
-  const handleFileUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (file) {
       setImportFile(file)
-      // Read file content for text-based reports
-      if (file.type === "text/plain" || file.type === "application/json") {
+      setPdfParseError(null)
+      console.log("[v0] File selected:", file.name, "Type:", file.type, "Size:", file.size)
+      
+      // Read file content for all text-based reports
+      const isTextFile = file.type === "text/plain" || 
+                         file.type === "application/json" ||
+                         file.type === "text/csv" ||
+                         file.name.endsWith(".txt") ||
+                         file.name.endsWith(".json") ||
+                         file.name.endsWith(".csv")
+      
+      if (isTextFile) {
         const reader = new FileReader()
         reader.onload = (event) => {
-          setImportText((event.target?.result as string) || "")
+          const content = (event.target?.result as string) || ""
+          console.log("[v0] File content loaded, length:", content.length)
+          setImportText(content)
+        }
+        reader.onerror = (error) => {
+          console.error("[v0] Error reading file:", error)
         }
         reader.readAsText(file)
+      } else if (file.type === "application/pdf" || file.name.endsWith(".pdf")) {
+        // PDF files cannot be parsed automatically - show instructions
+        setPdfParseError("I file PDF non possono essere letti automaticamente. Segui le istruzioni qui sotto per copiare e incollare il contenuto.")
+        setImportText("")
       }
     }
   }, [])
 
-  // Import and parse report
+  // Load historical reports from database
+  const loadHistoricalReports = useCallback(async () => {
+    if (!athleteId) return
+    
+    try {
+      const { data, error } = await supabase
+        .from("athlete_reports")
+        .select("*")
+        .eq("athlete_id", athleteId)
+        .order("created_at", { ascending: false })
+      
+      if (!error && data) {
+        setHistoricalReports(data)
+      }
+    } catch (error) {
+      console.error("Error loading historical reports:", error)
+    }
+  }, [athleteId])
+  
+  useEffect(() => {
+    loadHistoricalReports()
+  }, [loadHistoricalReports])
+  
+  // Compare selected reports
+  const compareReports = () => {
+    if (selectedReportsForComparison.length < 2) return
+    
+    const reportsToCompare = historicalReports.filter(r => 
+      selectedReportsForComparison.includes(r.id)
+    ).sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
+    
+    if (reportsToCompare.length < 2) return
+    
+    const comparison: any = {
+      reports: reportsToCompare,
+      changes: [],
+      trends: {}
+    }
+    
+    // Compare diversity index
+    const firstReport = reportsToCompare[0]
+    const lastReport = reportsToCompare[reportsToCompare.length - 1]
+    
+    if (firstReport.parsed_data?.diversity_index && lastReport.parsed_data?.diversity_index) {
+      const change = lastReport.parsed_data.diversity_index - firstReport.parsed_data.diversity_index
+      comparison.trends.diversityIndex = {
+        first: firstReport.parsed_data.diversity_index,
+        last: lastReport.parsed_data.diversity_index,
+        change: change,
+        trend: change > 0 ? "improving" : change < 0 ? "declining" : "stable"
+      }
+    }
+    
+    // Compare F/B ratio
+    if (firstReport.parsed_data?.firmicutes_bacteroidetes_ratio && lastReport.parsed_data?.firmicutes_bacteroidetes_ratio) {
+      const change = lastReport.parsed_data.firmicutes_bacteroidetes_ratio - firstReport.parsed_data.firmicutes_bacteroidetes_ratio
+      comparison.trends.fbRatio = {
+        first: firstReport.parsed_data.firmicutes_bacteroidetes_ratio,
+        last: lastReport.parsed_data.firmicutes_bacteroidetes_ratio,
+        change: change,
+        trend: Math.abs(change) < 0.2 ? "stable" : change > 0 ? "increasing" : "decreasing"
+      }
+    }
+    
+    // Compare AI analysis results if available
+    if (firstReport.ai_analysis && lastReport.ai_analysis) {
+      comparison.aiComparison = {
+        first: firstReport.ai_analysis,
+        last: lastReport.ai_analysis
+      }
+    }
+    
+    setComparisonData(comparison)
+    setShowComparisonDialog(true)
+  }
+
+  // AI-powered analysis function
+  const runAiAnalysis = async (rawData: string, analysisType: string) => {
+    console.log("[v0] runAiAnalysis called:", { analysisType, dataLength: rawData?.length })
+    
+    if (!rawData || rawData.trim().length === 0) {
+      console.error("[v0] No data to analyze")
+      return null
+    }
+    
+    try {
+      console.log("[v0] Sending request to /api/microbiome-analysis")
+      const response = await fetch('/api/microbiome-analysis', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          rawData, 
+          analysisType,
+          currentNutrition: null // TODO: Integrate with nutrition plan
+        })
+      })
+      
+      console.log("[v0] Response status:", response.status)
+      
+      if (!response.ok) {
+        const errorText = await response.text()
+        console.error("[v0] API error:", errorText)
+        throw new Error('Analysis failed: ' + errorText)
+      }
+      
+      const result = await response.json()
+      console.log("[v0] AI Analysis result:", result)
+      return result
+    } catch (error) {
+      console.error('[v0] AI Analysis error:', error)
+      return null
+    }
+  }
+
+  // Import and parse report with AI
   const handleImportReport = async () => {
-    if (!importFile && !importText) return
+    console.log("[v0] handleImportReport called:", { 
+      hasFile: !!importFile, 
+      textLength: importText?.length,
+      reportType: selectedReportType 
+    })
+    
+    if (!importFile && !importText) {
+      console.log("[v0] No file or text to import")
+      return
+    }
 
     setIsAnalyzing(true)
+    setIsAiAnalyzing(true)
 
     try {
       const newReport: MicrobiomeReport = {
@@ -586,18 +745,41 @@ export function MicrobiomeEpigenetic({ athleteId, metabolicProfile, trainingDay 
         status: "pending",
       }
 
-      // Parse based on type
-      // In production, this would use AI or specific parsers
-      // For now, we'll simulate parsed data
-
       if (selectedReportType === "microbiome") {
+        // Step 1: Parse bacteria with AI
+        setAiAnalysisStep("Analizzando batteri e capacita genetiche...")
+        const bacteriaResult = await runAiAnalysis(importText, 'parse')
+        
+        if (bacteriaResult?.success) {
+          setAiAnalysisResults(bacteriaResult.data)
+          
+          // Step 2: Analyze pathways
+          setAiAnalysisStep("Analizzando pathway metabolici e sostanze tossiche...")
+          const pathwayResult = await runAiAnalysis(JSON.stringify(bacteriaResult.data), 'pathways')
+          
+          if (pathwayResult?.success) {
+            setAiPathways(pathwayResult.data)
+          }
+          
+          // Step 3: Generate recommendations
+          setAiAnalysisStep("Generando raccomandazioni nutrizionali personalizzate...")
+          const recommendationsResult = await runAiAnalysis(
+            JSON.stringify({ bacteria: bacteriaResult.data, pathways: pathwayResult?.data }), 
+            'recommendations'
+          )
+          
+          if (recommendationsResult?.success) {
+            setAiRecommendations(recommendationsResult.data)
+          }
+        }
+        
+        // Also use the fallback parser for basic data
         const parsedMicrobiome: ParsedMicrobiomeData = parseMicrobiomeReport(importText)
         newReport.parsed_data = parsedMicrobiome
         newReport.status = "parsed"
         setMicrobiomeData(parsedMicrobiome)
-
-        // Generate food-bacteria protocol
         generateFoodBacteriaProtocol(parsedMicrobiome)
+        
       } else if (selectedReportType === "genetic") {
         const parsedGenetic: ParsedGeneticData = parseGeneticReport(importText)
         newReport.parsed_data = parsedGenetic
@@ -618,6 +800,9 @@ export function MicrobiomeEpigenetic({ athleteId, metabolicProfile, trainingDay 
           report_name: newReport.name,
           raw_data: importText,
           parsed_data: newReport.parsed_data,
+          ai_analysis: aiAnalysisResults,
+          ai_recommendations: aiRecommendations,
+          ai_pathways: aiPathways,
           status: "parsed",
         })
       }
@@ -628,14 +813,19 @@ export function MicrobiomeEpigenetic({ athleteId, metabolicProfile, trainingDay 
       if (microbiomeData || geneticData || bloodData) {
         generateMetabolicTargets()
       }
+      
+      // Reload historical reports
+      await loadHistoricalReports()
 
       setImportDialogOpen(false)
       setImportFile(null)
       setImportText("")
+      setAiAnalysisStep("")
     } catch (error) {
-      console.error("[v0] Error importing report:", error)
+      console.error("Error importing report:", error)
     } finally {
       setIsAnalyzing(false)
+      setIsAiAnalyzing(false)
     }
   }
 
@@ -1328,24 +1518,32 @@ export function MicrobiomeEpigenetic({ athleteId, metabolicProfile, trainingDay 
 
       {/* Main Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid grid-cols-4 w-full max-w-2xl">
-          <TabsTrigger value="overview" className="gap-1">
-            <Activity className="h-4 w-4" />
-            Overview
-          </TabsTrigger>
-          <TabsTrigger value="microbiome" className="gap-1">
-            <Bug className="h-4 w-4" />
-            Mod. 10
-          </TabsTrigger>
-          <TabsTrigger value="food-bacteria" className="gap-1">
-            <Leaf className="h-4 w-4" />
-            Mod. 11
-          </TabsTrigger>
-          <TabsTrigger value="epigenetic" className="gap-1">
-            <Dna className="h-4 w-4" />
-            Mod. 12
-          </TabsTrigger>
-        </TabsList>
+<TabsList className="grid grid-cols-6 w-full max-w-4xl">
+            <TabsTrigger value="overview" className="gap-1">
+              <Activity className="h-4 w-4" />
+              <span className="hidden sm:inline">Overview</span>
+            </TabsTrigger>
+            <TabsTrigger value="microbiome" className="gap-1">
+              <Bug className="h-4 w-4" />
+              <span className="hidden sm:inline">Mod. 10</span>
+            </TabsTrigger>
+            <TabsTrigger value="ai-analysis" className="gap-1">
+              <Brain className="h-4 w-4" />
+              <span className="hidden sm:inline">AI Analysis</span>
+            </TabsTrigger>
+            <TabsTrigger value="history" className="gap-1">
+              <Calendar className="h-4 w-4" />
+              <span className="hidden sm:inline">Storico</span>
+            </TabsTrigger>
+            <TabsTrigger value="food-bacteria" className="gap-1">
+              <Leaf className="h-4 w-4" />
+              <span className="hidden sm:inline">Mod. 11</span>
+            </TabsTrigger>
+            <TabsTrigger value="epigenetic" className="gap-1">
+              <Dna className="h-4 w-4" />
+              <span className="hidden sm:inline">Mod. 12</span>
+            </TabsTrigger>
+          </TabsList>
 
         {/* Overview Tab */}
         <TabsContent value="overview" className="space-y-4">
@@ -1702,6 +1900,701 @@ export function MicrobiomeEpigenetic({ athleteId, metabolicProfile, trainingDay 
           </Card>
         </TabsContent>
 
+        {/* AI Analysis Tab */}
+        <TabsContent value="ai-analysis" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Brain className="h-5 w-5 text-purple-500" />
+                Analisi AI del Microbioma
+              </CardTitle>
+              <CardDescription>
+                Analisi avanzata con AI: database scientifici, pathway metabolici, raccomandazioni personalizzate
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {isAiAnalyzing && (
+                <div className="text-center py-8">
+                  <RefreshCw className="h-12 w-12 mx-auto mb-4 animate-spin text-purple-500" />
+                  <p className="font-medium">{aiAnalysisStep || "Analisi in corso..."}</p>
+                  <p className="text-sm text-muted-foreground mt-2">
+                    L'AI sta consultando database scientifici e analizzando i pathway...
+                  </p>
+                </div>
+              )}
+
+              {!isAiAnalyzing && !aiAnalysisResults && (
+                <div className="text-center py-8 text-muted-foreground">
+                  <Brain className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                  <p className="mb-4">Importa un test del microbiota per attivare l'analisi AI avanzata</p>
+                  <Button onClick={() => { setSelectedReportType("microbiome"); setImportDialogOpen(true); }}>
+                    <Upload className="h-4 w-4 mr-2" />
+                    Importa Test Microbiota
+                  </Button>
+                </div>
+              )}
+
+              {aiAnalysisResults && (
+                <div className="space-y-6">
+                  {/* Key Findings */}
+                  <div className="p-4 rounded-lg bg-purple-50 dark:bg-purple-950/20 border border-purple-200 dark:border-purple-800">
+                    <h4 className="font-semibold mb-3 flex items-center gap-2">
+                      <Target className="h-4 w-4 text-purple-500" />
+                      Risultati Chiave
+                    </h4>
+                    <div className="grid grid-cols-3 gap-4 mb-4">
+                      <div className="text-center p-3 bg-white dark:bg-slate-900 rounded-lg">
+                        <div className="text-2xl font-bold text-purple-600">{aiAnalysisResults.diversityIndex?.toFixed(2) || "N/A"}</div>
+                        <div className="text-xs text-muted-foreground">Indice Shannon</div>
+                      </div>
+                      <div className="text-center p-3 bg-white dark:bg-slate-900 rounded-lg">
+                        <div className="text-2xl font-bold text-purple-600">{aiAnalysisResults.firmicutesBacteroidetesRatio?.toFixed(2) || "N/A"}</div>
+                        <div className="text-xs text-muted-foreground">Ratio F/B</div>
+                      </div>
+                      <div className="text-center p-3 bg-white dark:bg-slate-900 rounded-lg">
+                        <Badge className={`text-sm ${aiAnalysisResults.overallHealth === "optimal" ? "bg-green-500" : aiAnalysisResults.overallHealth === "good" ? "bg-blue-500" : aiAnalysisResults.overallHealth === "suboptimal" ? "bg-yellow-500" : "bg-red-500"}`}>
+                          {aiAnalysisResults.overallHealth || "N/A"}
+                        </Badge>
+                        <div className="text-xs text-muted-foreground mt-1">Salute Generale</div>
+                      </div>
+                    </div>
+                    {aiAnalysisResults.keyFindings && (
+                      <div className="space-y-1">
+                        {aiAnalysisResults.keyFindings.map((finding: string, i: number) => (
+                          <div key={i} className="flex items-start gap-2 text-sm">
+                            <CheckCircle2 className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
+                            <span>{finding}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {aiAnalysisResults.riskFactors && aiAnalysisResults.riskFactors.length > 0 && (
+                      <div className="mt-3 pt-3 border-t border-purple-200 dark:border-purple-800">
+                        <p className="text-sm font-medium text-red-600 dark:text-red-400 mb-2">Fattori di Rischio:</p>
+                        {aiAnalysisResults.riskFactors.map((risk: string, i: number) => (
+                          <div key={i} className="flex items-start gap-2 text-sm">
+                            <AlertTriangle className="h-4 w-4 text-red-500 mt-0.5 flex-shrink-0" />
+                            <span>{risk}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Bacteria Analysis with Scientific Evidence */}
+                  {aiAnalysisResults.bacteria && (
+                    <div>
+                      <h4 className="font-semibold mb-3">Batteri Analizzati con Evidenze Scientifiche</h4>
+                      <ScrollArea className="h-[400px]">
+                        <div className="space-y-3">
+                          {aiAnalysisResults.bacteria.map((b: any, i: number) => (
+                            <div key={i} className="p-4 rounded-lg border">
+                              <div className="flex items-center justify-between mb-2">
+                                <span className="font-medium">{b.name}</span>
+                                <div className="flex items-center gap-2">
+                                  <span className="text-sm">{b.abundance}%</span>
+                                  <Badge className={getStatusColor(b.status)}>{b.status}</Badge>
+                                </div>
+                              </div>
+                              <div className="text-xs text-muted-foreground mb-2">
+                                Range: {b.referenceRange?.min}-{b.referenceRange?.max}%
+                              </div>
+                              
+                              {/* Metabolic Functions */}
+                              <div className="mb-2">
+                                <span className="text-xs font-medium">Funzioni Metaboliche:</span>
+                                <div className="flex flex-wrap gap-1 mt-1">
+                                  {b.metabolicFunctions?.map((f: string, j: number) => (
+                                    <Badge key={j} variant="secondary" className="text-xs">{f}</Badge>
+                                  ))}
+                                </div>
+                              </div>
+                              
+                              {/* Genetic Capabilities */}
+                              {b.geneticCapabilities && b.geneticCapabilities.length > 0 && (
+                                <div className="mb-2">
+                                  <span className="text-xs font-medium">Capacita Genetiche:</span>
+                                  <div className="flex flex-wrap gap-1 mt-1">
+                                    {b.geneticCapabilities.map((g: string, j: number) => (
+                                      <Badge key={j} variant="outline" className="text-xs bg-blue-50 dark:bg-blue-950/20">{g}</Badge>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                              
+                              {/* Toxic Potential */}
+                              {b.toxicPotential && b.toxicPotential.level !== "none" && (
+                                <div className="mb-2 p-2 rounded bg-red-50 dark:bg-red-950/20">
+                                  <span className="text-xs font-medium text-red-600 dark:text-red-400">
+                                    Potenziale Tossico: {b.toxicPotential.level}
+                                  </span>
+                                  {b.toxicPotential.substances?.length > 0 && (
+                                    <div className="flex flex-wrap gap-1 mt-1">
+                                      {b.toxicPotential.substances.map((s: string, j: number) => (
+                                        <Badge key={j} variant="destructive" className="text-xs">{s}</Badge>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                              
+                              {/* Scientific Evidence */}
+                              {b.scientificEvidence && b.scientificEvidence.length > 0 && (
+                                <div className="mt-2 pt-2 border-t">
+                                  <span className="text-xs font-medium">Evidenze Scientifiche:</span>
+                                  <div className="mt-1 space-y-1">
+                                    {b.scientificEvidence.slice(0, 2).map((e: any, j: number) => (
+                                      <div key={j} className="text-xs p-1.5 rounded bg-muted">
+                                        <span className="italic">"{e.finding}"</span>
+                                        <span className="text-muted-foreground ml-1">- {e.source}</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </ScrollArea>
+                    </div>
+                  )}
+
+                  {/* Pathway Analysis */}
+                  {aiPathways && (
+                    <div>
+                      <h4 className="font-semibold mb-3 flex items-center gap-2">
+                        <FlaskConical className="h-4 w-4 text-orange-500" />
+                        Pathway Metabolici
+                      </h4>
+                      
+                      {/* SCFA Production */}
+                      {aiPathways.scfaProduction && (
+                        <div className="p-4 rounded-lg border mb-4">
+                          <h5 className="font-medium mb-3">Produzione SCFA</h5>
+                          <div className="grid grid-cols-3 gap-4">
+                            <div>
+                              <div className="flex justify-between text-sm mb-1">
+                                <span>Butirrato</span>
+                                <span>{aiPathways.scfaProduction.butyrate?.level || 0}%</span>
+                              </div>
+                              <Progress value={aiPathways.scfaProduction.butyrate?.level || 0} className="h-2" />
+                              <p className="text-xs text-muted-foreground mt-1">{aiPathways.scfaProduction.butyrate?.status}</p>
+                            </div>
+                            <div>
+                              <div className="flex justify-between text-sm mb-1">
+                                <span>Propionato</span>
+                                <span>{aiPathways.scfaProduction.propionate?.level || 0}%</span>
+                              </div>
+                              <Progress value={aiPathways.scfaProduction.propionate?.level || 0} className="h-2" />
+                              <p className="text-xs text-muted-foreground mt-1">{aiPathways.scfaProduction.propionate?.status}</p>
+                            </div>
+                            <div>
+                              <div className="flex justify-between text-sm mb-1">
+                                <span>Acetato</span>
+                                <span>{aiPathways.scfaProduction.acetate?.level || 0}%</span>
+                              </div>
+                              <Progress value={aiPathways.scfaProduction.acetate?.level || 0} className="h-2" />
+                              <p className="text-xs text-muted-foreground mt-1">{aiPathways.scfaProduction.acetate?.status}</p>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                      
+                      {/* Toxic Metabolites */}
+                      {aiPathways.toxicMetabolites && aiPathways.toxicMetabolites.length > 0 && (
+                        <div className="p-4 rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/20 mb-4">
+                          <h5 className="font-medium mb-3 text-red-600 dark:text-red-400 flex items-center gap-2">
+                            <AlertTriangle className="h-4 w-4" />
+                            Metaboliti Tossici Potenziali
+                          </h5>
+                          <div className="space-y-2">
+                            {aiPathways.toxicMetabolites.map((t: any, i: number) => (
+                              <div key={i} className="p-2 rounded bg-white dark:bg-slate-900">
+                                <div className="flex justify-between">
+                                  <span className="font-medium text-sm">{t.name}</span>
+                                </div>
+                                <p className="text-xs text-muted-foreground">Prodotto da: {t.producedBy?.join(", ")}</p>
+                                <p className="text-xs text-red-600 dark:text-red-400">Rischio: {t.healthRisk}</p>
+                                <p className="text-xs text-green-600 dark:text-green-400">Strategia: {t.detoxStrategy}</p>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* AI Recommendations */}
+                  {aiRecommendations && (
+                    <div>
+                      <h4 className="font-semibold mb-3 flex items-center gap-2">
+                        <Leaf className="h-4 w-4 text-green-500" />
+                        Raccomandazioni Nutrizionali AI
+                      </h4>
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {/* Foods to Eliminate */}
+                        {aiRecommendations.foodsToEliminate && aiRecommendations.foodsToEliminate.length > 0 && (
+                          <div className="p-4 rounded-lg border border-red-200 dark:border-red-800">
+                            <h5 className="font-medium mb-3 text-red-600 dark:text-red-400">Alimenti da ELIMINARE</h5>
+                            <div className="space-y-2">
+                              {aiRecommendations.foodsToEliminate.map((f: any, i: number) => (
+                                <div key={i} className="p-2 rounded bg-red-50 dark:bg-red-950/20">
+                                  <div className="flex justify-between items-start">
+                                    <span className="font-medium text-sm">{f.food}</span>
+                                    <Badge variant="destructive" className="text-xs">{f.priority}</Badge>
+                                  </div>
+                                  <p className="text-xs text-muted-foreground mt-1">{f.reason}</p>
+                                  <p className="text-xs mt-1">Durata: {f.duration}</p>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        
+                        {/* Foods to Introduce */}
+                        {aiRecommendations.foodsToIntroduce && aiRecommendations.foodsToIntroduce.length > 0 && (
+                          <div className="p-4 rounded-lg border border-green-200 dark:border-green-800">
+                            <h5 className="font-medium mb-3 text-green-600 dark:text-green-400">Alimenti da INTRODURRE</h5>
+                            <div className="space-y-2">
+                              {aiRecommendations.foodsToIntroduce.map((f: any, i: number) => (
+                                <div key={i} className="p-2 rounded bg-green-50 dark:bg-green-950/20">
+                                  <div className="flex justify-between items-start">
+                                    <span className="font-medium text-sm">{f.food}</span>
+                                    <Badge className="text-xs bg-green-500">{f.priority}</Badge>
+                                  </div>
+                                  <p className="text-xs text-muted-foreground mt-1">{f.benefit}</p>
+                                  <p className="text-xs mt-1">Timing: {f.timing} | Frequenza: {f.frequency}</p>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                      
+                      {/* Supplements */}
+                      {aiRecommendations.supplementsRecommended && aiRecommendations.supplementsRecommended.length > 0 && (
+                        <div className="mt-4 p-4 rounded-lg border border-purple-200 dark:border-purple-800">
+                          <h5 className="font-medium mb-3 text-purple-600 dark:text-purple-400">Supplementi Raccomandati</h5>
+                          <div className="overflow-x-auto">
+                            <table className="w-full text-sm">
+                              <thead>
+                                <tr className="border-b">
+                                  <th className="text-left py-2 px-2">Supplemento</th>
+                                  <th className="text-left py-2 px-2">Dose</th>
+                                  <th className="text-left py-2 px-2">Timing</th>
+                                  <th className="text-left py-2 px-2">Motivo</th>
+                                  <th className="text-left py-2 px-2">Priorita</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {aiRecommendations.supplementsRecommended.map((s: any, i: number) => (
+                                  <tr key={i} className="border-b">
+                                    <td className="py-2 px-2 font-medium">{s.name}</td>
+                                    <td className="py-2 px-2">{s.dose}</td>
+                                    <td className="py-2 px-2">{s.timing}</td>
+                                    <td className="py-2 px-2 text-xs">{s.reason}</td>
+                                    <td className="py-2 px-2">
+                                      <Badge className={`text-xs ${s.priority === "essential" ? "bg-red-500" : s.priority === "recommended" ? "bg-yellow-500" : "bg-gray-500"}`}>
+                                        {s.priority}
+                                      </Badge>
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      )}
+                      
+                      {/* Probiotics */}
+                      {aiRecommendations.probioticsRecommended && aiRecommendations.probioticsRecommended.length > 0 && (
+                        <div className="mt-4 p-4 rounded-lg border border-blue-200 dark:border-blue-800">
+                          <h5 className="font-medium mb-3 text-blue-600 dark:text-blue-400">Probiotici Consigliati</h5>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                            {aiRecommendations.probioticsRecommended.map((p: any, i: number) => (
+                              <div key={i} className="p-2 rounded bg-blue-50 dark:bg-blue-950/20">
+                                <span className="font-medium text-sm">{p.strain}</span>
+                                <span className="text-xs ml-2">({p.cfu})</span>
+                                <p className="text-xs text-muted-foreground">{p.benefit}</p>
+                                <p className="text-xs">Timing: {p.timing}</p>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* History Tab - Compare Tests Over Time */}
+        <TabsContent value="history" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Calendar className="h-5 w-5 text-blue-500" />
+                Storico Test e Confronto nel Tempo
+              </CardTitle>
+              <CardDescription>
+                Visualizza tutti i test caricati e confronta i cambiamenti nel tempo
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {historicalReports.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  <Calendar className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                  <p className="mb-4">Nessun test caricato. Importa il tuo primo test per iniziare.</p>
+                  <Button onClick={() => setImportDialogOpen(true)}>
+                    <Upload className="h-4 w-4 mr-2" />
+                    Importa Primo Test
+                  </Button>
+                </div>
+              ) : (
+                <div className="space-y-6">
+                  {/* Action Bar */}
+                  <div className="flex items-center justify-between p-4 rounded-lg bg-muted/50">
+                    <div>
+                      <p className="font-medium">{historicalReports.length} test caricati</p>
+                      <p className="text-sm text-muted-foreground">
+                        Seleziona 2 o piu test per confrontarli
+                      </p>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button 
+                        variant="outline" 
+                        onClick={() => setSelectedReportsForComparison([])}
+                        disabled={selectedReportsForComparison.length === 0}
+                        className="bg-transparent"
+                      >
+                        Deseleziona Tutti
+                      </Button>
+                      <Button 
+                        onClick={compareReports}
+                        disabled={selectedReportsForComparison.length < 2}
+                      >
+                        <Activity className="h-4 w-4 mr-2" />
+                        Confronta ({selectedReportsForComparison.length})
+                      </Button>
+                      <Button onClick={() => setImportDialogOpen(true)}>
+                        <Upload className="h-4 w-4 mr-2" />
+                        Nuovo Test
+                      </Button>
+                    </div>
+                  </div>
+                  
+                  {/* Timeline of Reports */}
+                  <div className="relative">
+                    <div className="absolute left-4 top-0 bottom-0 w-0.5 bg-border" />
+                    <div className="space-y-4">
+                      {historicalReports.map((report, index) => {
+                        const isSelected = selectedReportsForComparison.includes(report.id)
+                        const reportDate = new Date(report.created_at)
+                        
+                        return (
+                          <div 
+                            key={report.id}
+                            className={`relative pl-10 cursor-pointer transition-all ${
+                              isSelected ? "opacity-100" : "opacity-80 hover:opacity-100"
+                            }`}
+                            onClick={() => {
+                              if (isSelected) {
+                                setSelectedReportsForComparison(prev => prev.filter(id => id !== report.id))
+                              } else {
+                                setSelectedReportsForComparison(prev => [...prev, report.id])
+                              }
+                            }}
+                          >
+                            {/* Timeline Dot */}
+                            <div className={`absolute left-2 top-4 w-4 h-4 rounded-full border-2 ${
+                              isSelected 
+                                ? "bg-primary border-primary" 
+                                : "bg-background border-border"
+                            }`}>
+                              {isSelected && <CheckCircle2 className="h-3 w-3 text-primary-foreground absolute -top-0.5 -left-0.5" />}
+                            </div>
+                            
+                            <Card className={`${isSelected ? "border-primary ring-2 ring-primary/20" : ""}`}>
+                              <CardContent className="p-4">
+                                <div className="flex items-start justify-between">
+                                  <div className="flex-1">
+                                    <div className="flex items-center gap-2 mb-2">
+                                      <Badge variant={
+                                        report.report_type === "microbiome" ? "default" :
+                                        report.report_type === "genetic" ? "secondary" : "outline"
+                                      }>
+                                        {report.report_type === "microbiome" ? "Microbiota" :
+                                         report.report_type === "genetic" ? "Genetico" : "Sangue"}
+                                      </Badge>
+                                      <span className="text-sm text-muted-foreground">
+                                        {reportDate.toLocaleDateString("it-IT", { 
+                                          day: "numeric", 
+                                          month: "long", 
+                                          year: "numeric" 
+                                        })}
+                                      </span>
+                                      {index === 0 && (
+                                        <Badge variant="outline" className="bg-green-50 dark:bg-green-950/20 text-green-600">
+                                          Piu Recente
+                                        </Badge>
+                                      )}
+                                    </div>
+                                    
+                                    <h4 className="font-medium mb-2">{report.report_name || "Test " + (historicalReports.length - index)}</h4>
+                                    
+                                    {/* Key Metrics Preview */}
+                                    {report.parsed_data && (
+                                      <div className="grid grid-cols-3 gap-4 mt-3">
+                                        {report.parsed_data.diversity_index && (
+                                          <div className="text-center p-2 rounded bg-muted">
+                                            <div className="text-lg font-bold">{report.parsed_data.diversity_index.toFixed(2)}</div>
+                                            <div className="text-xs text-muted-foreground">Shannon Index</div>
+                                          </div>
+                                        )}
+                                        {report.parsed_data.firmicutes_bacteroidetes_ratio && (
+                                          <div className="text-center p-2 rounded bg-muted">
+                                            <div className="text-lg font-bold">{report.parsed_data.firmicutes_bacteroidetes_ratio.toFixed(2)}</div>
+                                            <div className="text-xs text-muted-foreground">Ratio F/B</div>
+                                          </div>
+                                        )}
+                                        {report.ai_analysis?.overallHealth && (
+                                          <div className="text-center p-2 rounded bg-muted">
+                                            <Badge className={`${
+                                              report.ai_analysis.overallHealth === "optimal" ? "bg-green-500" :
+                                              report.ai_analysis.overallHealth === "good" ? "bg-blue-500" :
+                                              report.ai_analysis.overallHealth === "suboptimal" ? "bg-yellow-500" : "bg-red-500"
+                                            }`}>
+                                              {report.ai_analysis.overallHealth}
+                                            </Badge>
+                                            <div className="text-xs text-muted-foreground mt-1">Salute</div>
+                                          </div>
+                                        )}
+                                      </div>
+                                    )}
+                                    
+                                    {/* AI Summary if available */}
+                                    {report.ai_analysis?.keyFindings && (
+                                      <div className="mt-3 p-2 rounded bg-purple-50 dark:bg-purple-950/20">
+                                        <p className="text-xs font-medium text-purple-600 dark:text-purple-400 mb-1">AI Summary:</p>
+                                        <p className="text-xs text-muted-foreground line-clamp-2">
+                                          {report.ai_analysis.keyFindings.slice(0, 2).join(". ")}
+                                        </p>
+                                      </div>
+                                    )}
+                                  </div>
+                                  
+                                  <div className="flex items-center gap-2 ml-4">
+                                    <Button 
+                                      size="sm" 
+                                      variant="ghost"
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        // Load this report's data
+                                        if (report.parsed_data) {
+                                          setMicrobiomeData(report.parsed_data)
+                                        }
+                                        if (report.ai_analysis) {
+                                          setAiAnalysisResults(report.ai_analysis)
+                                        }
+                                        if (report.ai_recommendations) {
+                                          setAiRecommendations(report.ai_recommendations)
+                                        }
+                                        if (report.ai_pathways) {
+                                          setAiPathways(report.ai_pathways)
+                                        }
+                                      }}
+                                    >
+                                      <FileText className="h-4 w-4" />
+                                    </Button>
+                                  </div>
+                                </div>
+                              </CardContent>
+                            </Card>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+          
+          {/* Comparison Dialog */}
+          <Dialog open={showComparisonDialog} onOpenChange={setShowComparisonDialog}>
+            <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  <Activity className="h-5 w-5 text-blue-500" />
+                  Confronto Test nel Tempo
+                </DialogTitle>
+                <DialogDescription>
+                  Analisi delle variazioni tra i test selezionati
+                </DialogDescription>
+              </DialogHeader>
+              
+              {comparisonData && (
+                <div className="space-y-6">
+                  {/* Date Range */}
+                  <div className="p-4 rounded-lg bg-muted/50">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm text-muted-foreground">Primo test</p>
+                        <p className="font-medium">
+                          {new Date(comparisonData.reports[0]?.created_at).toLocaleDateString("it-IT", { 
+                            day: "numeric", month: "long", year: "numeric" 
+                          })}
+                        </p>
+                      </div>
+                      <div className="flex-1 mx-4 border-t border-dashed" />
+                      <div className="text-right">
+                        <p className="text-sm text-muted-foreground">Ultimo test</p>
+                        <p className="font-medium">
+                          {new Date(comparisonData.reports[comparisonData.reports.length - 1]?.created_at).toLocaleDateString("it-IT", { 
+                            day: "numeric", month: "long", year: "numeric" 
+                          })}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {/* Trends */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Diversity Index Trend */}
+                    {comparisonData.trends?.diversityIndex && (
+                      <Card>
+                        <CardContent className="p-4">
+                          <h4 className="font-medium mb-3">Indice di Diversita (Shannon)</h4>
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="text-center">
+                              <div className="text-2xl font-bold">{comparisonData.trends.diversityIndex.first.toFixed(2)}</div>
+                              <div className="text-xs text-muted-foreground">Primo test</div>
+                            </div>
+                            <div className="flex-1 mx-4 flex items-center justify-center">
+                              <Badge className={`${
+                                comparisonData.trends.diversityIndex.trend === "improving" ? "bg-green-500" :
+                                comparisonData.trends.diversityIndex.trend === "declining" ? "bg-red-500" : "bg-gray-500"
+                              }`}>
+                                {comparisonData.trends.diversityIndex.change > 0 ? "+" : ""}
+                                {comparisonData.trends.diversityIndex.change.toFixed(2)}
+                              </Badge>
+                            </div>
+                            <div className="text-center">
+                              <div className="text-2xl font-bold">{comparisonData.trends.diversityIndex.last.toFixed(2)}</div>
+                              <div className="text-xs text-muted-foreground">Ultimo test</div>
+                            </div>
+                          </div>
+                          <p className={`text-sm text-center ${
+                            comparisonData.trends.diversityIndex.trend === "improving" ? "text-green-600" :
+                            comparisonData.trends.diversityIndex.trend === "declining" ? "text-red-600" : "text-gray-600"
+                          }`}>
+                            {comparisonData.trends.diversityIndex.trend === "improving" ? "In miglioramento" :
+                             comparisonData.trends.diversityIndex.trend === "declining" ? "In diminuzione" : "Stabile"}
+                          </p>
+                        </CardContent>
+                      </Card>
+                    )}
+                    
+                    {/* F/B Ratio Trend */}
+                    {comparisonData.trends?.fbRatio && (
+                      <Card>
+                        <CardContent className="p-4">
+                          <h4 className="font-medium mb-3">Ratio Firmicutes/Bacteroidetes</h4>
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="text-center">
+                              <div className="text-2xl font-bold">{comparisonData.trends.fbRatio.first.toFixed(2)}</div>
+                              <div className="text-xs text-muted-foreground">Primo test</div>
+                            </div>
+                            <div className="flex-1 mx-4 flex items-center justify-center">
+                              <Badge className={`${
+                                comparisonData.trends.fbRatio.trend === "stable" ? "bg-green-500" : "bg-yellow-500"
+                              }`}>
+                                {comparisonData.trends.fbRatio.change > 0 ? "+" : ""}
+                                {comparisonData.trends.fbRatio.change.toFixed(2)}
+                              </Badge>
+                            </div>
+                            <div className="text-center">
+                              <div className="text-2xl font-bold">{comparisonData.trends.fbRatio.last.toFixed(2)}</div>
+                              <div className="text-xs text-muted-foreground">Ultimo test</div>
+                            </div>
+                          </div>
+                          <p className="text-sm text-center text-muted-foreground">
+                            Range ottimale: 1.0 - 2.0
+                          </p>
+                        </CardContent>
+                      </Card>
+                    )}
+                  </div>
+                  
+                  {/* Detailed Comparison Table */}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-base">Dettaglio Confronto</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                          <thead>
+                            <tr className="border-b">
+                              <th className="text-left py-2 px-2">Data</th>
+                              <th className="text-left py-2 px-2">Shannon Index</th>
+                              <th className="text-left py-2 px-2">Ratio F/B</th>
+                              <th className="text-left py-2 px-2">Salute</th>
+                              <th className="text-left py-2 px-2">Note</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {comparisonData.reports.map((report: any, i: number) => (
+                              <tr key={report.id} className="border-b">
+                                <td className="py-2 px-2">
+                                  {new Date(report.created_at).toLocaleDateString("it-IT")}
+                                </td>
+                                <td className="py-2 px-2 font-medium">
+                                  {report.parsed_data?.diversity_index?.toFixed(2) || "-"}
+                                </td>
+                                <td className="py-2 px-2 font-medium">
+                                  {report.parsed_data?.firmicutes_bacteroidetes_ratio?.toFixed(2) || "-"}
+                                </td>
+                                <td className="py-2 px-2">
+                                  {report.ai_analysis?.overallHealth ? (
+                                    <Badge className={`text-xs ${
+                                      report.ai_analysis.overallHealth === "optimal" ? "bg-green-500" :
+                                      report.ai_analysis.overallHealth === "good" ? "bg-blue-500" :
+                                      report.ai_analysis.overallHealth === "suboptimal" ? "bg-yellow-500" : "bg-red-500"
+                                    }`}>
+                                      {report.ai_analysis.overallHealth}
+                                    </Badge>
+                                  ) : "-"}
+                                </td>
+                                <td className="py-2 px-2 text-xs text-muted-foreground">
+                                  {report.ai_analysis?.keyFindings?.[0]?.slice(0, 50) || "-"}...
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+              )}
+              
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setShowComparisonDialog(false)} className="bg-transparent">
+                  Chiudi
+                </Button>
+                <Button onClick={() => window.print()}>
+                  <Printer className="h-4 w-4 mr-2" />
+                  Stampa Confronto
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </TabsContent>
+
         {/* Module 11: Food -> Bacteria Mapping */}
         <TabsContent value="food-bacteria" className="space-y-4">
           <Card>
@@ -2048,7 +2941,7 @@ export function MicrobiomeEpigenetic({ athleteId, metabolicProfile, trainingDay 
             Importa Report
           </Button>
         </DialogTrigger>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Importa Test / Report</DialogTitle>
             <DialogDescription>
@@ -2078,19 +2971,46 @@ export function MicrobiomeEpigenetic({ athleteId, metabolicProfile, trainingDay 
               </div>
             </div>
 
-            {/* File upload */}
-            <div className="space-y-2">
-              <Label>Carica File (PDF, TXT, JSON)</Label>
-              <Input type="file" accept=".pdf,.txt,.json,.csv" onChange={handleFileUpload} />
-              {importFile && <p className="text-sm text-muted-foreground">File selezionato: {importFile.name}</p>}
-            </div>
+{/* File upload */}
+  <div className="space-y-2">
+  <Label>Carica File (PDF, TXT, JSON, CSV)</Label>
+  <Input type="file" accept=".pdf,.txt,.json,.csv" onChange={handleFileUpload} />
+  
+  
+  
+  {pdfParseError && (
+  <div className="p-4 rounded bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800">
+    <p className="text-sm font-medium text-amber-700 dark:text-amber-400 mb-2">Come importare un file PDF:</p>
+    <ol className="text-xs text-amber-800 dark:text-amber-300 space-y-1 list-decimal list-inside">
+      <li>Apri il file PDF con un lettore PDF (Adobe, Preview, Chrome)</li>
+      <li>Seleziona tutto il testo (Ctrl+A su Windows, Cmd+A su Mac)</li>
+      <li>Copia il testo (Ctrl+C su Windows, Cmd+C su Mac)</li>
+      <li>Incolla il testo nella textarea qui sotto (Ctrl+V o Cmd+V)</li>
+    </ol>
+  </div>
+  )}
+  
+  {importFile && !pdfParseError && (
+  <div className="p-2 rounded bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800">
+  <p className="text-sm text-green-700 dark:text-green-400">File selezionato: {importFile.name}</p>
+  {importText && <p className="text-xs text-muted-foreground mt-1">Contenuto estratto: {importText.length} caratteri</p>}
+  </div>
+  )}
+  </div>
+  
+  {/* Manual text input */}
+  <div className="space-y-2">
+  <Label>Oppure incolla i dati del report manualmente</Label>
+  <Textarea
+  placeholder="Incolla qui i risultati del test del microbiota...
 
-            {/* Manual text input */}
-            <div className="space-y-2">
-              <Label>Oppure incolla i dati del report</Label>
-              <Textarea
-                placeholder="Incolla qui i risultati del test..."
-                className="min-h-[150px] font-mono text-sm"
+Esempio formato:
+Bacteroides: 35.2%
+Firmicutes: 45.8%
+Akkermansia muciniphila: 2.1%
+Bifidobacterium: 5.3%
+..."
+  className="min-h-[200px] font-mono text-sm"
                 value={importText}
                 onChange={(e) => setImportText(e.target.value)}
               />
@@ -2100,6 +3020,16 @@ export function MicrobiomeEpigenetic({ athleteId, metabolicProfile, trainingDay 
               <div className="space-y-2 text-center">
                 <Progress value={uploadProgress} className="h-2" />
                 <p className="text-sm text-muted-foreground">{Math.round(uploadProgress)}% caricato...</p>
+              </div>
+            )}
+            
+            {isAiAnalyzing && (
+              <div className="space-y-3 text-center p-4 rounded-lg bg-purple-50 dark:bg-purple-950/20">
+                <RefreshCw className="h-8 w-8 mx-auto animate-spin text-purple-500" />
+                <p className="font-medium text-purple-700 dark:text-purple-300">{aiAnalysisStep}</p>
+                <p className="text-xs text-muted-foreground">
+                  L'AI sta analizzando i batteri, consultando database scientifici e generando raccomandazioni personalizzate...
+                </p>
               </div>
             )}
           </div>
