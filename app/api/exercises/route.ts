@@ -1,61 +1,25 @@
 import { NextResponse } from 'next/server';
 
 const RAPIDAPI_KEY = process.env.RAPID_API_KEY;
-// AscendAPI "Exercise DB with Videos and Images" - host corretto dalla documentazione
+// AscendAPI "Exercise DB with Videos and Images"
 const RAPIDAPI_HOST = 'exercise-db-with-videos-and-images-by-ascendapi.p.rapidapi.com';
 
 // Cache per evitare chiamate ripetute
 const exerciseCache = new Map<string, { data: any; timestamp: number }>();
 const CACHE_DURATION = 1000 * 60 * 60; // 1 ora
 
-// Mappatura gruppi muscolari italiani -> inglesi per l'API
-// I bodyPart dell'API AscendAPI sono: back, cardio, chest, lower arms, lower legs, neck, shoulders, upper arms, upper legs, waist
-const MUSCLE_GROUP_MAP: Record<string, string> = {
-  'petto': 'chest',
-  'chest': 'chest',
-  'schiena': 'back',
-  'back': 'back',
-  'spalle': 'shoulders',
-  'shoulders': 'shoulders',
-  'braccia': 'upper arms',
-  'bicipiti': 'upper arms',
-  'biceps': 'upper arms',
-  'tricipiti': 'upper arms',
-  'triceps': 'upper arms',
-  'upper arms': 'upper arms',
-  'gambe': 'upper legs',
-  'legs': 'upper legs',
-  'quadricipiti': 'upper legs',
-  'upper legs': 'upper legs',
-  'polpacci': 'lower legs',
-  'lower legs': 'lower legs',
-  'calves': 'lower legs',
-  'glutei': 'upper legs',
-  'glutes': 'upper legs',
-  'core': 'waist',
-  'addominali': 'waist',
-  'abs': 'waist',
-  'waist': 'waist',
-  'avambracci': 'lower arms',
-  'forearms': 'lower arms',
-  'lower arms': 'lower arms',
-  'cardio': 'cardio',
-  'neck': 'neck',
-  'collo': 'neck',
-};
-
-// Traduzioni italiano per i nomi dei muscoli
-const MUSCLE_TRANSLATIONS: Record<string, string> = {
-  'chest': 'Petto',
-  'back': 'Schiena',
-  'shoulders': 'Spalle',
-  'upper arms': 'Braccia',
-  'upper legs': 'Gambe',
-  'lower legs': 'Polpacci',
-  'waist': 'Addominali',
-  'lower arms': 'Avambracci',
-  'cardio': 'Cardio',
-  'neck': 'Collo',
+// Mappatura gruppi muscolari per ricerca
+const BODYPART_SEARCH_TERMS: Record<string, string[]> = {
+  'chest': ['chest', 'pec', 'bench press', 'fly'],
+  'back': ['back', 'lat', 'row', 'pull'],
+  'shoulders': ['shoulder', 'delt', 'press', 'lateral raise'],
+  'upper arms': ['bicep', 'tricep', 'curl', 'extension'],
+  'upper legs': ['leg', 'quad', 'hamstring', 'squat', 'lunge'],
+  'lower legs': ['calf', 'calves', 'tibialis'],
+  'waist': ['ab', 'core', 'crunch', 'plank'],
+  'lower arms': ['forearm', 'wrist', 'grip'],
+  'cardio': ['cardio', 'run', 'jump', 'burpee'],
+  'neck': ['neck', 'trap'],
 };
 
 async function fetchFromAPI(endpoint: string, params: Record<string, string> = {}) {
@@ -87,9 +51,7 @@ function formatExercise(ex: any) {
   return {
     id: ex.exerciseId || ex.id || Math.random().toString(36).substr(2, 9),
     name: ex.name || 'Unknown Exercise',
-    nameIt: ex.name,
     bodyPart: ex.bodyPart || 'general',
-    bodyPartIt: MUSCLE_TRANSLATIONS[ex.bodyPart] || ex.bodyPart,
     target: ex.targetMuscle || ex.target || ex.bodyPart,
     secondaryMuscles: ex.secondaryMuscles || [],
     equipment: ex.equipments?.[0] || ex.equipment || 'body weight',
@@ -105,13 +67,12 @@ export async function GET(request: Request) {
     const bodyPart = searchParams.get('bodyPart') || searchParams.get('muscle');
     const search = searchParams.get('search');
     const limit = searchParams.get('limit') || '30';
-    const offset = searchParams.get('offset') || '0';
 
-    console.log('[v0] Exercise API request:', { bodyPart, search, limit, offset });
+    console.log('[v0] Exercise API request:', { bodyPart, search, limit });
 
-    // Cerca per nome
+    // Cerca per nome usando endpoint search
     if (search) {
-      const cacheKey = `search_${search}_${limit}_${offset}`;
+      const cacheKey = `search_${search}_${limit}`;
       const cached = exerciseCache.get(cacheKey);
       if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
         console.log('[v0] Returning cached search results');
@@ -119,11 +80,18 @@ export async function GET(request: Request) {
       }
 
       try {
-        // AscendAPI search endpoint
-        const result = await fetchFromAPI('/exercises/name/' + encodeURIComponent(search));
-        const exercises = Array.isArray(result) 
-          ? result.slice(0, parseInt(limit)).map(formatExercise)
-          : (result.data || []).slice(0, parseInt(limit)).map(formatExercise);
+        // Endpoint: /api/v1/exercises/search?search=xxx
+        const result = await fetchFromAPI('/api/v1/exercises/search', { search: search });
+        
+        let rawExercises: any[] = [];
+        if (result.success && result.data) {
+          rawExercises = result.data;
+        } else if (Array.isArray(result)) {
+          rawExercises = result;
+        }
+        
+        const exercises = rawExercises.slice(0, parseInt(limit)).map(formatExercise);
+        console.log('[v0] Search results:', exercises.length);
         
         const responseData = { success: true, exercises, total: exercises.length };
         exerciseCache.set(cacheKey, { data: responseData, timestamp: Date.now() });
@@ -134,25 +102,23 @@ export async function GET(request: Request) {
       }
     }
 
-    // Cerca per gruppo muscolare
+    // Cerca per gruppo muscolare usando search
     if (bodyPart) {
-      const mappedBodyPart = MUSCLE_GROUP_MAP[bodyPart.toLowerCase()] || bodyPart;
-      const cacheKey = `bodypart_${mappedBodyPart}_${limit}_${offset}`;
+      const cacheKey = `bodypart_${bodyPart}_${limit}`;
       const cached = exerciseCache.get(cacheKey);
       if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
-        console.log('[v0] Returning cached bodyPart results for:', mappedBodyPart);
+        console.log('[v0] Returning cached bodyPart results for:', bodyPart);
         return NextResponse.json(cached.data);
       }
 
       try {
-        // AscendAPI "Exercise DB" - endpoint per bodyPart
-        // Formato URL: /exercises/bodyPart/{bodyPart}?limit=X&offset=Y
-        const result = await fetchFromAPI('/exercises/bodyPart/' + encodeURIComponent(mappedBodyPart), {
-          limit: limit,
-          offset: offset
-        });
+        // Usa il primo termine di ricerca per il bodyPart
+        const searchTerms = BODYPART_SEARCH_TERMS[bodyPart.toLowerCase()];
+        const searchTerm = searchTerms ? searchTerms[0] : bodyPart;
         
-        // La risposta puo' essere {success: true, data: [...]} oppure array diretto
+        // Endpoint: /api/v1/exercises/search?search=xxx
+        const result = await fetchFromAPI('/api/v1/exercises/search', { search: searchTerm });
+        
         let rawExercises: any[] = [];
         if (result.success && result.data) {
           rawExercises = result.data;
@@ -160,8 +126,26 @@ export async function GET(request: Request) {
           rawExercises = result;
         }
         
-        const exercises = rawExercises.slice(0, parseInt(limit)).map(formatExercise);
-        console.log('[v0] Fetched exercises for', mappedBodyPart, ':', exercises.length);
+        // Filtra per bodyPart se necessario
+        const filteredExercises = rawExercises.filter(ex => {
+          const exBodyPart = (ex.bodyPart || '').toLowerCase();
+          const exTarget = (ex.targetMuscle || ex.target || '').toLowerCase();
+          const exName = (ex.name || '').toLowerCase();
+          
+          // Controlla se l'esercizio corrisponde al gruppo muscolare
+          if (searchTerms) {
+            return searchTerms.some(term => 
+              exBodyPart.includes(term) || 
+              exTarget.includes(term) || 
+              exName.includes(term)
+            );
+          }
+          return true;
+        });
+        
+        const exercises = filteredExercises.slice(0, parseInt(limit)).map(formatExercise);
+        console.log('[v0] Fetched exercises for', bodyPart, ':', exercises.length);
+        
         const responseData = { success: true, exercises, total: exercises.length };
         exerciseCache.set(cacheKey, { data: responseData, timestamp: Date.now() });
         return NextResponse.json(responseData);
@@ -171,22 +155,25 @@ export async function GET(request: Request) {
       }
     }
 
-    // Lista tutti gli esercizi (con paginazione)
-    const cacheKey = `all_${limit}_${offset}`;
+    // Lista tutti gli esercizi
+    const cacheKey = `all_${limit}`;
     const cached = exerciseCache.get(cacheKey);
     if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
       return NextResponse.json(cached.data);
     }
 
     try {
-      const result = await fetchFromAPI('/exercises', { 
-        limit: limit,
-        offset: offset 
-      });
-      const exercises = Array.isArray(result) 
-        ? result.slice(0, parseInt(limit)).map(formatExercise)
-        : (result.data || []).slice(0, parseInt(limit)).map(formatExercise);
+      // Endpoint: /api/v1/exercises
+      const result = await fetchFromAPI('/api/v1/exercises');
       
+      let rawExercises: any[] = [];
+      if (result.success && result.data) {
+        rawExercises = result.data;
+      } else if (Array.isArray(result)) {
+        rawExercises = result;
+      }
+      
+      const exercises = rawExercises.slice(0, parseInt(limit)).map(formatExercise);
       const responseData = { success: true, exercises, total: exercises.length };
       exerciseCache.set(cacheKey, { data: responseData, timestamp: Date.now() });
       return NextResponse.json(responseData);
@@ -204,7 +191,6 @@ export async function GET(request: Request) {
   }
 }
 
-// Endpoint per ottenere i gruppi muscolari e attrezzature disponibili
 export async function POST(request: Request) {
   try {
     const body = await request.json();
