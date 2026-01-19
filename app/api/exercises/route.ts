@@ -1,9 +1,8 @@
 import { NextResponse } from 'next/server';
 
 const RAPIDAPI_KEY = process.env.RAPID_API_KEY;
-// AscendAPI "Exercise DB with Videos and Images" - prova diversi host
-// Host possibili: exercisedb.p.rapidapi.com, exercisedb-api.p.rapidapi.com
-const RAPIDAPI_HOST = 'exercisedb.p.rapidapi.com';
+// AscendAPI "Exercise DB with Videos and Images" - host corretto dalla documentazione
+const RAPIDAPI_HOST = 'exercise-db-with-videos-and-images-by-ascendapi.p.rapidapi.com';
 
 // Cache per evitare chiamate ripetute
 const exerciseCache = new Map<string, { data: any; timestamp: number }>();
