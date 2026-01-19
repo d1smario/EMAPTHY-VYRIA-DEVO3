@@ -624,21 +624,19 @@ const STIMULUS_TYPES = [
   },
 ]
 
-// Muscle Groups
+// Muscle Groups - allineati con API ExerciseDB (AscendAPI)
+// bodyPart validi: back, cardio, chest, lower arms, lower legs, neck, shoulders, upper arms, upper legs, waist
 const MUSCLE_GROUPS = [
-  { id: "gambe", name: "Gambe" },
-  { id: "quadricipiti", name: "Quadricipiti" },
-  { id: "femorali", name: "Femorali" },
-  { id: "glutei", name: "Glutei" },
-  { id: "polpacci", name: "Polpacci" },
-  { id: "petto", name: "Petto" },
-  { id: "dorsali", name: "Dorsali" },
-  { id: "spalle", name: "Spalle" },
-  { id: "bicipiti", name: "Bicipiti" },
-  { id: "tricipiti", name: "Tricipiti" },
-  { id: "addominali", name: "Addominali" },
-  { id: "lombari", name: "Lombari" },
-  { id: "core", name: "Core" },
+  { id: "chest", name: "Chest" },
+  { id: "back", name: "Back" },
+  { id: "shoulders", name: "Shoulders" },
+  { id: "upper arms", name: "Upper Arms" },
+  { id: "upper legs", name: "Upper Legs" },
+  { id: "waist", name: "Waist / Core" },
+  { id: "lower legs", name: "Lower Legs" },
+  { id: "lower arms", name: "Lower Arms" },
+  { id: "cardio", name: "Cardio" },
+  { id: "neck", name: "Neck" },
 ]
 
 function getDefaultWeight(stimulus: string): string {
@@ -1018,7 +1016,7 @@ export function GymWorkoutBuilder({
                         <img
                           src={
                             workout.exercise.image_url ||
-                            `/placeholder.svg?height=80&width=80&query=${encodeURIComponent(workout.exercise.name)}`
+                            `/placeholder.svg?height=80&width=80&query=${encodeURIComponent(workout.exercise.name) || "/placeholder.svg"}`
                           }
                           alt={workout.exercise.name}
                           className="w-full h-full object-cover"
