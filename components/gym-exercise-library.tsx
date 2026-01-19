@@ -1,29 +1,45 @@
+
 "use client"
 
-import { useState, useMemo, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { Dumbbell, Plus, Clock, Flame, X, RotateCcw, Save, Calendar, Loader2, FileDown } from "lucide-react"
+import { Dumbbell, Plus, Clock, Flame, X, RotateCcw, Save, Calendar, FileDown, Info, Loader2 } from "lucide-react"
 import Image from "next/image"
 
-// Types
+// Gruppi muscolari - nomi ESATTI dall'API ExerciseDB (AscendAPI)
+// bodyPart validi: back, cardio, chest, lower arms, lower legs, neck, shoulders, upper arms, upper legs, waist
+const MUSCLE_GROUPS = [
+  { id: "chest", name: "Chest", color: "#ef4444" },
+  { id: "back", name: "Back", color: "#3b82f6" },
+  { id: "shoulders", name: "Shoulders", color: "#f97316" },
+  { id: "upper arms", name: "Upper Arms", color: "#22c55e" },
+  { id: "upper legs", name: "Upper Legs", color: "#06b6d4" },
+  { id: "waist", name: "Waist / Core", color: "#eab308" },
+  { id: "lower legs", name: "Lower Legs", color: "#8b5cf6" },
+  { id: "lower arms", name: "Lower Arms", color: "#ec4899" },
+  { id: "cardio", name: "Cardio", color: "#14b8a6" },
+  { id: "neck", name: "Neck", color: "#6366f1" },
+]
+
 interface Exercise {
   id: string
   name: string
   nameIt?: string
   bodyPart: string
-  target: string
-  secondaryMuscles: string[]
-  equipment: string
-  gifUrl: string
-  instructions: string[]
-  difficulty?: string
+  bodyPartIt?: string
+  target?: string
+  secondaryMuscles?: string[]
+  equipment?: string
+  gifUrl?: string
+  imageUrl?: string
+  instructions?: string[]
 }
 
 interface SelectedExercise extends Exercise {
@@ -50,75 +66,90 @@ interface GymExerciseLibraryProps {
   athleteId?: string
 }
 
-const MUSCLE_GROUPS = [
-  { id: "chest", name: "Petto", bodyPart: "chest", color: "bg-red-500" },
-  { id: "back", name: "Dorsali", bodyPart: "back", color: "bg-blue-500" },
-  { id: "shoulders", name: "Spalle", bodyPart: "shoulders", color: "bg-yellow-500" },
-  { id: "arms", name: "Braccia", bodyPart: "upper arms", color: "bg-purple-500" },
-  { id: "legs", name: "Gambe", bodyPart: "upper legs", color: "bg-green-500" },
-  { id: "glutes", name: "Glutei", bodyPart: "upper legs", color: "bg-pink-500" },
-  { id: "core", name: "Core", bodyPart: "waist", color: "bg-orange-500" },
-  { id: "calves", name: "Polpacci", bodyPart: "lower legs", color: "bg-indigo-500" },
-  { id: "cardio", name: "Cardio", bodyPart: "cardio", color: "bg-rose-500" },
-  { id: "forearms", name: "Avambracci", bodyPart: "lower arms", color: "bg-teal-500" },
-]
-
 export default function GymExerciseLibrary({
   onSaveWorkout,
   selectedDay = 0,
   onDayChange,
-  dayNames = ["Lunedì", "Martedì", "Mercoledì", "Giovedì", "Venerdì", "Sabato", "Domenica"],
+  dayNames = ["Lunedi", "Martedi", "Mercoledi", "Giovedi", "Venerdi", "Sabato", "Domenica"],
   athleteId,
 }: GymExerciseLibraryProps) {
-  const [selectedGroup, setSelectedGroup] = useState("chest")
+  const [selectedGroup, setSelectedGroup] = useState<string>("chest")
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedExercises, setSelectedExercises] = useState<SelectedExercise[]>([])
   const [showExerciseDetail, setShowExerciseDetail] = useState<Exercise | null>(null)
   const [workoutName, setWorkoutName] = useState("")
   const [workoutNotes, setWorkoutNotes] = useState("")
-
   const [exercises, setExercises] = useState<Exercise[]>([])
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [apiSource, setApiSource] = useState<string>("")
 
-  useEffect(() => {
-    const loadExercises = async () => {
-      setLoading(true)
-      setError(null)
-      try {
-        const group = MUSCLE_GROUPS.find((g) => g.id === selectedGroup)
-        const bodyPart = group?.bodyPart || selectedGroup
-
-        const res = await fetch(`/api/exercises?bodyPart=${encodeURIComponent(bodyPart)}&limit=50`)
-        if (!res.ok) throw new Error("Failed to fetch exercises")
-
-        const data = await res.json()
-        setExercises(data.exercises || [])
-        setApiSource(data.source || "unknown")
-        console.log(`[v0] Loaded ${data.exercises?.length || 0} exercises from ${data.source}`)
-      } catch (err) {
-        console.error("Error loading exercises:", err)
-        setError("Errore nel caricamento degli esercizi")
-      } finally {
-        setLoading(false)
+  // Fetch exercises from API
+  const fetchExercises = useCallback(async (bodyPart: string) => {
+    setLoading(true)
+    setError(null)
+    try {
+      const response = await fetch(`/api/exercises?bodyPart=${encodeURIComponent(bodyPart)}&limit=50`)
+      const data = await response.json()
+      if (data.exercises) {
+        setExercises(data.exercises)
+      } else {
+        setError("Nessun esercizio trovato")
+        setExercises([])
       }
+    } catch (err) {
+      setError("Errore nel caricamento degli esercizi")
+      setExercises([])
+    } finally {
+      setLoading(false)
     }
-    loadExercises()
-  }, [selectedGroup])
+  }, [])
 
-  // Filter exercises by search
-  const filteredExercises = useMemo(() => {
-    if (!searchQuery) return exercises
-    const query = searchQuery.toLowerCase()
-    return exercises.filter(
-      (ex) =>
-        ex.name?.toLowerCase().includes(query) ||
-        ex.nameIt?.toLowerCase().includes(query) ||
-        ex.target?.toLowerCase().includes(query) ||
-        ex.equipment?.toLowerCase().includes(query),
-    )
-  }, [exercises, searchQuery])
+  // Search exercises
+  const searchExercises = useCallback(async (query: string) => {
+    if (!query.trim()) {
+      fetchExercises(selectedGroup)
+      return
+    }
+    setLoading(true)
+    setError(null)
+    try {
+      const response = await fetch(`/api/exercises?search=${encodeURIComponent(query)}&limit=50`)
+      const data = await response.json()
+      if (data.exercises) {
+        setExercises(data.exercises)
+      } else {
+        setError("Nessun esercizio trovato")
+        setExercises([])
+      }
+    } catch (err) {
+      setError("Errore nella ricerca")
+      setExercises([])
+    } finally {
+      setLoading(false)
+    }
+  }, [selectedGroup, fetchExercises])
+
+  // Load exercises when muscle group changes
+  useEffect(() => {
+    if (!searchQuery) {
+      fetchExercises(selectedGroup)
+    }
+  }, [selectedGroup, fetchExercises, searchQuery])
+
+  // Debounced search
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (searchQuery) {
+        searchExercises(searchQuery)
+      }
+    }, 500)
+    return () => clearTimeout(timer)
+  }, [searchQuery, searchExercises])
+
+  // Get color for muscle group
+  const getMuscleGroupColor = (groupId: string) => {
+    return MUSCLE_GROUPS.find(g => g.id === groupId)?.color || "#6b7280"
+  }
 
   // Add exercise to workout
   const addExercise = (exercise: Exercise) => {
@@ -147,14 +178,15 @@ export default function GymExerciseLibrary({
   }
 
   // Calculate totals
-  const totals = useMemo(() => {
-    const duration = selectedExercises.reduce((acc, ex) => {
+  const totals = {
+    duration: Math.round(selectedExercises.reduce((acc, ex) => {
       const setTime = ex.sets * (ex.reps * 3 + ex.restSeconds)
       return acc + setTime / 60
-    }, 0)
-    const calories = Math.round(duration * 6)
-    return { duration: Math.round(duration), calories }
-  }, [selectedExercises])
+    }, 0)),
+    calories: Math.round(selectedExercises.reduce((acc, ex) => {
+      return acc + ex.sets * ex.reps * 0.5
+    }, 0) * 6),
+  }
 
   // Save workout
   const handleSave = () => {
@@ -169,17 +201,10 @@ export default function GymExerciseLibrary({
       estimatedCalories: totals.calories,
       notes: workoutNotes,
     }
-    console.log("[v0] Saving gym workout:", workout.name, "with", workout.exercises.length, "exercises")
     if (onSaveWorkout) {
-      console.log("[v0] Calling onSaveWorkout callback")
       onSaveWorkout(workout)
-    } else {
-      console.log("[v0] WARNING: onSaveWorkout callback is not defined!")
-      alert("Errore: callback di salvataggio non definita")
-      return
     }
-    alert("Scheda salvata in Training!")
-    // Reset
+    alert("Scheda salvata!")
     setWorkoutName("")
     setWorkoutNotes("")
     setSelectedExercises([])
@@ -192,14 +217,13 @@ export default function GymExerciseLibrary({
     setSelectedExercises([])
   }
 
-  // PDF generation function
+  // PDF generation
   const handleDownloadPDF = () => {
     if (!workoutName.trim() || selectedExercises.length === 0) {
       alert("Inserisci un nome e almeno un esercizio")
       return
     }
 
-    // Create printable HTML content
     const printContent = `
       <!DOCTYPE html>
       <html>
@@ -208,7 +232,6 @@ export default function GymExerciseLibrary({
         <style>
           body { font-family: Arial, sans-serif; padding: 20px; max-width: 800px; margin: 0 auto; }
           h1 { color: #333; border-bottom: 2px solid #7c3aed; padding-bottom: 10px; }
-          .header { display: flex; justify-content: space-between; margin-bottom: 20px; }
           .stats { display: flex; gap: 20px; margin-bottom: 20px; padding: 10px; background: #f3f4f6; border-radius: 8px; }
           .stat { text-align: center; }
           .stat-value { font-size: 24px; font-weight: bold; color: #7c3aed; }
@@ -245,30 +268,25 @@ export default function GymExerciseLibrary({
             <tr>
               <th>#</th>
               <th>Esercizio</th>
+              <th>Muscolo</th>
               <th>Serie</th>
               <th>Reps</th>
-              <th>Peso (kg)</th>
-              <th>Recupero</th>
+              <th>Peso</th>
+              <th>Rec</th>
             </tr>
           </thead>
           <tbody>
-            ${selectedExercises
-              .map(
-                (ex, i) => `
+            ${selectedExercises.map((ex, i) => `
               <tr>
                 <td>${i + 1}</td>
-                <td>
-                  <div class="exercise-name">${ex.nameIt || ex.name}</div>
-                  <div class="muscle">${ex.target}</div>
-                </td>
+                <td class="exercise-name">${ex.name}</td>
+                <td class="muscle">${ex.target || ex.bodyPart}</td>
                 <td>${ex.sets}</td>
                 <td>${ex.reps}</td>
-                <td>${ex.weight || "-"}</td>
+                <td>${ex.weight || "-"} kg</td>
                 <td>${ex.restSeconds}s</td>
               </tr>
-            `,
-              )
-              .join("")}
+            `).join("")}
           </tbody>
         </table>
         ${workoutNotes ? `<div class="notes"><strong>Note:</strong> ${workoutNotes}</div>` : ""}
@@ -279,7 +297,6 @@ export default function GymExerciseLibrary({
       </html>
     `
 
-    // Open print dialog
     const printWindow = window.open("", "_blank")
     if (printWindow) {
       printWindow.document.write(printContent)
@@ -294,12 +311,7 @@ export default function GymExerciseLibrary({
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Dumbbell className="h-5 w-5 text-primary" />
-          <h2 className="text-lg font-semibold">Biblioteca Esercizi</h2>
-          {apiSource && (
-            <Badge variant="outline" className="text-xs">
-              {apiSource === "exercisedb" ? "ExerciseDB API" : "Database Locale"}
-            </Badge>
-          )}
+          <h2 className="text-lg font-semibold">Libreria Esercizi</h2>
         </div>
         <div className="flex items-center gap-2">
           <Select value={selectedDay.toString()} onValueChange={(v) => onDayChange?.(Number.parseInt(v))}>
@@ -318,19 +330,37 @@ export default function GymExerciseLibrary({
         </div>
       </div>
 
-      {/* Muscle Group Buttons - 2 righe */}
+      {/* Muscle Group Buttons */}
       <div className="grid grid-cols-5 gap-2">
         {MUSCLE_GROUPS.map((group) => (
           <Button
             key={group.id}
             variant={selectedGroup === group.id ? "default" : "outline"}
             size="sm"
-            onClick={() => setSelectedGroup(group.id)}
-            className={selectedGroup === group.id ? group.color : ""}
+            onClick={() => {
+              setSelectedGroup(group.id)
+              setSearchQuery("")
+            }}
+            style={selectedGroup === group.id ? { backgroundColor: group.color } : {}}
           >
             {group.name}
           </Button>
         ))}
+      </div>
+
+      {/* Search */}
+      <div className="flex gap-2">
+        <Input
+          placeholder="Cerca esercizio..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="max-w-md"
+        />
+        {searchQuery && (
+          <Button variant="ghost" size="sm" onClick={() => setSearchQuery("")}>
+            <X className="h-4 w-4" />
+          </Button>
+        )}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
@@ -338,22 +368,28 @@ export default function GymExerciseLibrary({
         <div className="lg:col-span-3">
           <Card className="bg-card">
             <CardHeader className="py-3">
-              <CardTitle className="text-sm">
-                Esercizi {MUSCLE_GROUPS.find((g) => g.id === selectedGroup)?.name} ({filteredExercises.length})
+              <CardTitle className="text-sm flex items-center gap-2">
+                <span 
+                  className="w-3 h-3 rounded-full" 
+                  style={{ backgroundColor: getMuscleGroupColor(selectedGroup) }}
+                />
+                {MUSCLE_GROUPS.find(g => g.id === selectedGroup)?.name || selectedGroup} 
+                {!loading && ` (${exercises.length})`}
               </CardTitle>
             </CardHeader>
             <CardContent className="p-2">
               {loading ? (
-                <div className="flex items-center justify-center py-8">
+                <div className="flex items-center justify-center h-[500px]">
                   <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                  <span className="ml-2">Caricamento esercizi...</span>
                 </div>
               ) : error ? (
-                <div className="text-center py-8 text-red-500">{error}</div>
+                <div className="flex items-center justify-center h-[500px] text-muted-foreground">
+                  {error}
+                </div>
               ) : (
                 <ScrollArea className="h-[500px]">
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-2 p-2">
-                    {filteredExercises.map((exercise) => (
+                    {exercises.map((exercise) => (
                       <Card
                         key={exercise.id}
                         className={`cursor-pointer hover:border-primary transition-colors ${
@@ -364,19 +400,38 @@ export default function GymExerciseLibrary({
                         <CardContent className="p-2">
                           <div className="relative aspect-square mb-2 rounded overflow-hidden bg-muted">
                             <Image
-                              src={exercise.gifUrl || "/placeholder.svg?height=150&width=150"}
+                              src={exercise.gifUrl || exercise.imageUrl || "/placeholder.svg"}
                               alt={exercise.name}
                               fill
                               className="object-cover"
                               unoptimized
+                              onError={(e) => {
+                                const target = e.target as HTMLImageElement
+                                target.src = "/placeholder.svg?height=150&width=150"
+                              }}
                             />
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="absolute top-1 right-1 h-6 w-6 p-0 bg-black/50 hover:bg-black/70"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                setShowExerciseDetail(exercise)
+                              }}
+                            >
+                              <Info className="h-3 w-3 text-white" />
+                            </Button>
                           </div>
-                          <p className="text-xs font-medium truncate">{exercise.nameIt || exercise.name}</p>
-                          <p className="text-xs text-muted-foreground truncate">{exercise.target}</p>
-                          <div className="flex gap-1 mt-1">
-                            <Badge variant="outline" className="text-xs px-1">
-                              {exercise.equipment}
-                            </Badge>
+                          <p className="text-xs font-medium truncate">{exercise.name}</p>
+                          <p className="text-xs text-muted-foreground truncate">
+                            {exercise.target || exercise.bodyPart}
+                          </p>
+                          <div className="flex gap-1 mt-1 flex-wrap">
+                            {exercise.equipment && (
+                              <Badge variant="outline" className="text-xs px-1">
+                                {exercise.equipment}
+                              </Badge>
+                            )}
                           </div>
                         </CardContent>
                       </Card>
@@ -420,49 +475,49 @@ export default function GymExerciseLibrary({
                       <Card key={ex.id} className="p-2">
                         <div className="flex items-center justify-between mb-2">
                           <span className="text-xs font-medium truncate flex-1">
-                            {idx + 1}. {ex.nameIt || ex.name}
+                            {idx + 1}. {ex.name}
                           </span>
                           <Button variant="ghost" size="sm" onClick={() => removeExercise(ex.id)}>
                             <X className="h-3 w-3" />
                           </Button>
                         </div>
-                        <div className="grid grid-cols-2 gap-2">
+                        <div className="grid grid-cols-4 gap-2">
                           <div>
-                            <Label className="text-xs text-white">Serie</Label>
+                            <Label className="text-xs">Serie</Label>
                             <Input
                               type="number"
                               value={ex.sets}
                               onChange={(e) => updateExercise(ex.id, "sets", Number.parseInt(e.target.value) || 0)}
-                              className="h-8 w-full min-w-[60px] text-sm text-white bg-zinc-800 border-zinc-600 text-center"
+                              className="h-8 text-sm text-center"
                             />
                           </div>
                           <div>
-                            <Label className="text-xs text-white">Reps</Label>
+                            <Label className="text-xs">Reps</Label>
                             <Input
                               type="number"
                               value={ex.reps}
                               onChange={(e) => updateExercise(ex.id, "reps", Number.parseInt(e.target.value) || 0)}
-                              className="h-8 w-full min-w-[60px] text-sm text-white bg-zinc-800 border-zinc-600 text-center"
+                              className="h-8 text-sm text-center"
                             />
                           </div>
                           <div>
-                            <Label className="text-xs text-white">Kg</Label>
+                            <Label className="text-xs">Kg</Label>
                             <Input
                               type="number"
                               value={ex.weight}
                               onChange={(e) => updateExercise(ex.id, "weight", Number.parseInt(e.target.value) || 0)}
-                              className="h-8 w-full min-w-[60px] text-sm text-white bg-zinc-800 border-zinc-600 text-center"
+                              className="h-8 text-sm text-center"
                             />
                           </div>
                           <div>
-                            <Label className="text-xs text-white">Rec(s)</Label>
+                            <Label className="text-xs">Rec</Label>
                             <Input
                               type="number"
                               value={ex.restSeconds}
                               onChange={(e) =>
                                 updateExercise(ex.id, "restSeconds", Number.parseInt(e.target.value) || 0)
                               }
-                              className="h-8 w-full min-w-[60px] text-sm text-white bg-zinc-800 border-zinc-600 text-center"
+                              className="h-8 text-sm text-center"
                             />
                           </div>
                         </div>
@@ -474,6 +529,12 @@ export default function GymExerciseLibrary({
 
               {selectedExercises.length > 0 && (
                 <>
+                  <Input
+                    placeholder="Note aggiuntive..."
+                    value={workoutNotes}
+                    onChange={(e) => setWorkoutNotes(e.target.value)}
+                    className="bg-background"
+                  />
                   <div className="flex justify-between text-sm border-t pt-2">
                     <span className="flex items-center gap-1">
                       <Clock className="h-4 w-4" /> {totals.duration} min
@@ -501,53 +562,65 @@ export default function GymExerciseLibrary({
 
       {/* Exercise detail modal */}
       <Dialog open={!!showExerciseDetail} onOpenChange={() => setShowExerciseDetail(null)}>
-        <DialogContent>
+        <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>{showExerciseDetail?.nameIt || showExerciseDetail?.name}</DialogTitle>
+            <DialogTitle>{showExerciseDetail?.name}</DialogTitle>
           </DialogHeader>
           {showExerciseDetail && (
             <div className="space-y-4">
               <div className="relative aspect-video rounded overflow-hidden bg-muted">
                 <Image
-                  src={showExerciseDetail.gifUrl || "/placeholder.svg"}
+                  src={showExerciseDetail.gifUrl || showExerciseDetail.imageUrl || "/placeholder.svg"}
                   alt={showExerciseDetail.name}
                   fill
                   className="object-contain"
                   unoptimized
                 />
               </div>
-              <div>
-                <h4 className="font-medium mb-1">Muscoli Target</h4>
-                <p className="text-sm text-muted-foreground">{showExerciseDetail.target}</p>
-              </div>
-              {showExerciseDetail.secondaryMuscles?.length > 0 && (
-                <div>
-                  <h4 className="font-medium mb-1">Muscoli Secondari</h4>
-                  <p className="text-sm text-muted-foreground">{showExerciseDetail.secondaryMuscles.join(", ")}</p>
+              <div className="space-y-2">
+                <div className="flex gap-2 flex-wrap">
+                  <Badge style={{ backgroundColor: getMuscleGroupColor(showExerciseDetail.bodyPart) }}>
+                    {showExerciseDetail.bodyPartIt || showExerciseDetail.bodyPart}
+                  </Badge>
+                  {showExerciseDetail.target && (
+                    <Badge variant="outline">{showExerciseDetail.target}</Badge>
+                  )}
+                  {showExerciseDetail.equipment && (
+                    <Badge variant="secondary">{showExerciseDetail.equipment}</Badge>
+                  )}
                 </div>
-              )}
-              <div>
-                <h4 className="font-medium mb-1">Attrezzatura</h4>
-                <p className="text-sm text-muted-foreground">{showExerciseDetail.equipment}</p>
+                {showExerciseDetail.secondaryMuscles && showExerciseDetail.secondaryMuscles.length > 0 && (
+                  <div>
+                    <p className="text-sm font-medium mb-1">Muscoli secondari:</p>
+                    <div className="flex gap-1 flex-wrap">
+                      {showExerciseDetail.secondaryMuscles.map((muscle, i) => (
+                        <Badge key={i} variant="outline" className="text-xs">
+                          {muscle}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {showExerciseDetail.instructions && showExerciseDetail.instructions.length > 0 && (
+                  <div>
+                    <p className="text-sm font-medium mb-1">Istruzioni:</p>
+                    <ol className="text-sm text-muted-foreground list-decimal list-inside space-y-1">
+                      {showExerciseDetail.instructions.map((instruction, i) => (
+                        <li key={i}>{instruction}</li>
+                      ))}
+                    </ol>
+                  </div>
+                )}
               </div>
-              {showExerciseDetail.instructions?.length > 0 && (
-                <div>
-                  <h4 className="font-medium mb-1">Istruzioni</h4>
-                  <ol className="list-decimal list-inside text-sm text-muted-foreground">
-                    {showExerciseDetail.instructions.map((instr, i) => (
-                      <li key={i}>{instr}</li>
-                    ))}
-                  </ol>
-                </div>
-              )}
+              <Button className="w-full" onClick={() => {
+                addExercise(showExerciseDetail)
+                setShowExerciseDetail(null)
+              }}>
+                <Plus className="h-4 w-4 mr-2" />
+                Aggiungi alla scheda
+              </Button>
             </div>
           )}
-          <DialogFooter>
-            <Button onClick={() => showExerciseDetail && addExercise(showExerciseDetail)}>
-              <Plus className="h-4 w-4 mr-2" />
-              Aggiungi alla Scheda
-            </Button>
-          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
