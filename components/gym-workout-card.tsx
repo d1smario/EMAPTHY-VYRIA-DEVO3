@@ -29,29 +29,34 @@ const STIMULUS_INFO: Record<string, { label: string; color: string; description:
   stretching: { label: "Stretching", color: "bg-cyan-500", description: "Allungamenti statici, 30-60s per muscolo" },
 }
 
-// Muscle group labels
+// Muscle group labels - allineati con API ExerciseDB
 const MUSCLE_LABELS: Record<string, string> = {
+  "chest": "Chest",
+  "back": "Back",
+  "shoulders": "Shoulders",
+  "upper arms": "Upper Arms",
+  "upper legs": "Upper Legs",
+  "waist": "Waist / Core",
+  "lower legs": "Lower Legs",
+  "lower arms": "Lower Arms",
+  "cardio": "Cardio",
+  "neck": "Neck",
+  // Legacy mappings per compatibilita'
   quadricipiti: "Quadricipiti",
   femorali: "Femorali",
   glutei: "Glutei",
   polpacci: "Polpacci",
-  gambe: "Gambe",
-  petto: "Petto",
-  dorsali: "Dorsali",
-  schiena: "Schiena",
-  spalle: "Spalle",
-  bicipiti: "Bicipiti",
-  tricipiti: "Tricipiti",
-  braccia: "Braccia",
-  addominali: "Addominali",
-  core: "Core",
-  lombari: "Lombari",
-  obliqui: "Obliqui",
-  deltoidi_lat: "Deltoidi Lat.",
-  deltoidi_ant: "Deltoidi Ant.",
-  deltoidi_post: "Deltoidi Post.",
-  romboidi: "Romboidi",
-  trapezio: "Trapezio",
+  gambe: "Upper Legs",
+  petto: "Chest",
+  dorsali: "Back",
+  schiena: "Back",
+  spalle: "Shoulders",
+  bicipiti: "Upper Arms",
+  tricipiti: "Upper Arms",
+  braccia: "Upper Arms",
+  addominali: "Waist / Core",
+  core: "Waist / Core",
+  lombari: "Back",
 }
 
 export function GymWorkoutCard({ session, athleteName, onClose }: GymWorkoutCardProps) {
