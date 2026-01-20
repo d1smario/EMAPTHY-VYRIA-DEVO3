@@ -45,6 +45,7 @@ import {
   Moon,
 } from "lucide-react"
 import { createBrowserClient } from "@supabase/ssr"
+import { AIAnalysisButton } from "@/components/ai-analysis-button"
 
 // ============================================
 // TYPES
@@ -1415,6 +1416,22 @@ export function MicrobiomeEpigenetic({ athleteId, metabolicProfile, trainingDay 
         </div>
 
         <div className="flex items-center gap-4">
+          {athleteId && (
+            <>
+              <AIAnalysisButton
+                athleteId={athleteId}
+                endpoint="microbiome"
+                buttonText="AI Microbioma"
+                context="Analisi interazioni microbioma-allenamento, pathway metabolici, protocollo pro/prebiotici"
+              />
+              <AIAnalysisButton
+                athleteId={athleteId}
+                endpoint="epigenetics"
+                buttonText="AI Epigenetica"
+                context="Analisi geni metilati, interazioni gene-microbioma, nutrigenomica"
+              />
+            </>
+          )}
           <div className="flex items-center gap-2">
             <Calendar className="h-4 w-4 text-muted-foreground" />
             <ToggleGroup
