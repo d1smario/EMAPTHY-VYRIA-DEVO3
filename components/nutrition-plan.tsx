@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Pill, Activity, Flame, Clock, Package, Sparkles } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
+import { AIAnalysisButton } from "@/components/ai-analysis-button"
 
 interface NutritionPlanProps {
   athleteData: AthleteDataType | null
@@ -2338,8 +2339,16 @@ function NutritionPlan({ athleteData, userName }: NutritionPlanProps) {
         <>
           {/* BioMap Section */}
           <Card className="col-span-1 md:col-span-2 lg:col-span-3">
-            <CardHeader>
+            <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle>BioMap & Nutrition Plan</CardTitle>
+              {athleteData?.id && (
+                <AIAnalysisButton
+                  athleteId={athleteData.id}
+                  endpoint="nutrition"
+                  buttonText="AI Consigli"
+                  context="Analisi nutrizionale completa con focus su timing, allergie, interazioni microbioma"
+                />
+              )}
             </CardHeader>
             <CardContent>
               <Tabs defaultValue={activeTab} onValueChange={(value) => setActiveTab(value)}>
