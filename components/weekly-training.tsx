@@ -35,6 +35,7 @@ import { WorkoutDetailModal } from "@/components/workout-detail-modal"
 import { createClient } from "@/lib/supabase/client"
 import GymExerciseLibrary from "./gym-exercise-library"
 import type { AthleteDataType, WorkoutType } from "@/components/dashboard-content"
+import { AIAnalysisButton } from "@/components/ai-analysis-button"
 
 interface WeeklyTrainingProps {
   athleteData: AthleteDataType | null
@@ -559,6 +560,14 @@ function WeeklyTraining({ athleteData, userName, workouts }: WeeklyTrainingProps
           </p>
         </div>
         <div className="flex gap-2">
+          {athleteData?.id && (
+            <AIAnalysisButton
+              athleteId={athleteData.id}
+              endpoint="training"
+              buttonText="AI Coach"
+              context="Analisi carico, periodizzazione, consigli settimanali basati su metabolismo e microbioma"
+            />
+          )}
           <Button
             variant="outline"
             onClick={() => {
