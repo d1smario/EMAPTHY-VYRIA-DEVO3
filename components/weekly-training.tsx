@@ -757,9 +757,9 @@ function WeeklyTraining({ athleteData, userName, workouts }: WeeklyTrainingProps
 
       {/* Workout Builder Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-2xl h-[90vh] flex flex-col p-0">
-          {/* Fixed Header */}
-          <DialogHeader className="shrink-0 p-4 border-b">
+<DialogContent className="max-w-2xl h-[90vh] flex flex-col p-0 bg-zinc-900 border-zinc-700">
+  {/* Fixed Header */}
+  <DialogHeader className="shrink-0 p-4 border-b border-zinc-700">
             <DialogTitle>
               {editingWorkout ? "Modifica" : "Nuovo"} Allenamento -{" "}
               {editingDayIndex !== null ? dayNames[editingDayIndex] : ""}
@@ -1017,7 +1017,7 @@ function WeeklyTraining({ athleteData, userName, workouts }: WeeklyTrainingProps
           </div>
 
           {/* Fixed Footer */}
-          <DialogFooter className="shrink-0 p-4 border-t bg-background flex gap-2">
+          <DialogFooter className="shrink-0 p-4 border-t border-zinc-700 bg-zinc-900 flex gap-2">
             <Button variant="outline" onClick={() => setDialogOpen(false)}>
               Annulla
             </Button>
