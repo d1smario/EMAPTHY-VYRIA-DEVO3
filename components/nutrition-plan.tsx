@@ -5,9 +5,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Pill, Activity, Flame, Clock, Package, Sparkles } from "lucide-react"
+import { Pill, Activity, Flame, Clock, Package, Sparkles, ShoppingCart, Download, FileText } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { AIAnalysisButton } from "@/components/ai-analysis-button"
+import { SUPPLEMENTS_DATABASE, getProductsByBrand, getCompatibleProducts, type SupplementProduct } from "@/lib/data/supplements-database"
+import { FOODS_DATABASE, filterFoodsByConstraints, getFoodsForMealTime, findAlternative, calculatePortionForMacro, type FoodItem } from "@/lib/data/foods-database"
+import { NutrigenomicsPanel } from "@/components/nutrigenomics-panel"
 
 interface NutritionPlanProps {
   athleteData: AthleteDataType | null
@@ -248,6 +251,49 @@ interface AthleteConstraintsData {
   dietary_preferences: string[]
   dietary_limits: string[]
   notes?: string // added notes field
+  foods_to_avoid?: string[] // AI corrections
+  foods_to_include?: string[] // AI corrections
+}
+
+// AI Ingredient Substitutions - applied inline to meals
+interface AISubstitution {
+  original: string
+  substitute: string
+  reason: string
+}
+
+// Built-in substitution rules based on common intolerances/allergies
+const INGREDIENT_SUBSTITUTIONS: Record<string, { substitute: string; reason: string }> = {
+  // Lattosio
+  "latte": { substitute: "latte di cocco", reason: "intolleranza lattosio" },
+  "latte intero": { substitute: "latte di cocco", reason: "intolleranza lattosio" },
+  "latte parzialmente scremato": { substitute: "latte di mandorla", reason: "intolleranza lattosio" },
+  "yogurt": { substitute: "yogurt di cocco", reason: "intolleranza lattosio" },
+  "yogurt greco": { substitute: "yogurt greco senza lattosio", reason: "intolleranza lattosio" },
+  "ricotta": { substitute: "tofu morbido", reason: "intolleranza lattosio" },
+  "parmigiano": { substitute: "lievito alimentare", reason: "intolleranza lattosio" },
+  "burro": { substitute: "burro chiarificato/ghee", reason: "intolleranza lattosio" },
+  "mozzarella": { substitute: "mozzarella senza lattosio", reason: "intolleranza lattosio" },
+  // Glutine
+  "pane": { substitute: "pane senza glutine", reason: "celiachia/intolleranza glutine" },
+  "pasta": { substitute: "pasta di riso/mais", reason: "celiachia/intolleranza glutine" },
+  "farina": { substitute: "farina di riso", reason: "celiachia/intolleranza glutine" },
+  "avena": { substitute: "avena certificata gluten-free", reason: "celiachia/intolleranza glutine" },
+  "farro": { substitute: "quinoa", reason: "celiachia/intolleranza glutine" },
+  "orzo": { substitute: "riso", reason: "celiachia/intolleranza glutine" },
+  // Uova
+  "uova": { substitute: "tofu strapazzato", reason: "allergia uova" },
+  "uovo": { substitute: "semi di chia + acqua", reason: "allergia uova" },
+  // Frutta secca
+  "noci": { substitute: "semi di zucca", reason: "allergia frutta secca" },
+  "mandorle": { substitute: "semi di girasole", reason: "allergia frutta secca" },
+  "nocciole": { substitute: "semi di canapa", reason: "allergia frutta secca" },
+  "arachidi": { substitute: "semi di zucca", reason: "allergia frutta secca" },
+  // Nichel
+  "pomodoro": { substitute: "peperoni", reason: "allergia nichel" },
+  "spinaci": { substitute: "lattuga", reason: "allergia nichel" },
+  "cacao": { substitute: "carruba", reason: "allergia nichel" },
+  "cioccolato": { substitute: "carruba", reason: "allergia nichel" },
 }
 
 // Interface for tracking used foods across the week
@@ -389,14 +435,77 @@ const getWorkoutType = (workout: any): string => {
   return "endurance" // default
 }
 
-const calculateMealTiming = (workoutTime: string | null, workoutType: string) => {
+const calculateMealTiming = (workoutTime: string | null, workoutType: string, preferredTrainingTime?: string | null) => {
   const profile = WORKOUT_METABOLIC_PROFILE[workoutType] || WORKOUT_METABOLIC_PROFILE.endurance
 
-  // Parse workout time (format: "HH:MM" or null)
-  let workoutHour = 7 // default morning
+  // Calculate meal windows
+  const meals = []
+
+  // CASO SPECIALE: Giorno di riposo - nessun pre/post workout
+  if (workoutType === "rest" || !workoutTime) {
+    // Colazione
+    meals.push({
+      time: "07:30",
+      type: "colazione",
+      name: "Colazione",
+      kcalPct: 0.25,
+      macroRatio: { cho: 0.5, pro: 0.25, fat: 0.25 },
+    })
+    // Spuntino
+    meals.push({
+      time: "10:30",
+      type: "spuntino",
+      name: "Spuntino",
+      kcalPct: 0.1,
+      macroRatio: { cho: 0.4, pro: 0.3, fat: 0.3 },
+    })
+    // Pranzo
+    meals.push({
+      time: "13:00",
+      type: "pranzo",
+      name: "Pranzo",
+      kcalPct: 0.3,
+      macroRatio: { cho: 0.4, pro: 0.3, fat: 0.3 },
+    })
+    // Merenda
+    meals.push({
+      time: "16:30",
+      type: "merenda",
+      name: "Merenda",
+      kcalPct: 0.1,
+      macroRatio: { cho: 0.35, pro: 0.35, fat: 0.3 },
+    })
+    // Cena
+    meals.push({
+      time: "20:00",
+      type: "cena",
+      name: "Cena",
+      kcalPct: 0.2,
+      macroRatio: { cho: 0.35, pro: 0.35, fat: 0.3 },
+    })
+    // Pre-sonno
+    meals.push({
+      time: "22:00",
+      type: "pre_sonno",
+      name: "Pre-Sonno",
+      kcalPct: 0.05,
+      macroRatio: { cho: 0.2, pro: 0.5, fat: 0.3 },
+    })
+    
+    return { meals, profile }
+  }
+
+  // Parse workout time
+  // Priority: 1) specific workout time (HH:MM), 2) athlete's preferred training slot, 3) default 10:00
+  let workoutHour = 10 // default mid-morning
+  
   if (workoutTime) {
+    // Format: "HH:MM"
     const parts = workoutTime.split(":")
-    workoutHour = Number.parseInt(parts[0]) || 7
+    workoutHour = Number.parseInt(parts[0]) || 10
+  } else if (preferredTrainingTime) {
+    // Format: "Pomeriggio (14-18)" - use parsePreferredTimeToHour
+    workoutHour = parsePreferredTimeToHour(preferredTrainingTime)
   }
 
   workoutHour = Math.max(5, workoutHour)
@@ -405,9 +514,6 @@ const calculateMealTiming = (workoutTime: string | null, workoutType: string) =>
   const isMorning = workoutHour >= 8 && workoutHour < 12
   const isAfternoon = workoutHour >= 12 && workoutHour < 17
   const isEvening = workoutHour >= 17
-
-  // Calculate meal windows
-  const meals = []
 
   if (isEarlyMorning) {
     meals.push({
@@ -639,41 +745,272 @@ const MEAL_DATABASE: Record<
   }[]
 > = {
   colazione: [
+    // === COLAZIONI DOLCI SENZA LATTOSIO ===
     {
       name: "Porridge avena con banana e miele",
-      cho: 65,
-      fat: 8,
-      pro: 12,
-      kcal: 380,
-      tags: ["vegetarian", "high-carb"],
+      cho: 62, fat: 10, pro: 10, kcal: 375,
+      tags: ["vegetarian", "lactose-free", "high-carb"],
       ingredients: [
-        { name: "Fiocchi d'avena", grams: 80 },
-        { name: "Latte", grams: 200 },
+        { name: "Fiocchi avena", grams: 80 },
+        { name: "Bevanda avena", grams: 200 },
         { name: "Banana", grams: 100 },
         { name: "Miele", grams: 15 },
       ],
     },
     {
-      name: "Toast integrali con uova e avocado",
-      cho: 35,
-      fat: 22,
-      pro: 18,
-      kcal: 410,
-      tags: ["vegetarian", "balanced"],
+      name: "Overnight oats frutti di bosco",
+      cho: 58, fat: 12, pro: 14, kcal: 390,
+      tags: ["vegetarian", "lactose-free", "high-carb"],
       ingredients: [
-        { name: "Pane integrale", grams: 60 },
-        { name: "Uova", grams: 100 },
-        { name: "Avocado", grams: 50 },
-        { name: "Pomodoro", grams: 30 },
+        { name: "Fiocchi avena", grams: 70 },
+        { name: "Bevanda soia", grams: 180 },
+        { name: "Semi di chia", grams: 15 },
+        { name: "Frutti di bosco", grams: 80 },
+        { name: "Miele", grams: 15 },
       ],
     },
     {
-      name: "Yogurt greco con muesli e frutti di bosco",
-      cho: 45,
-      fat: 12,
-      pro: 20,
-      kcal: 370,
-      tags: ["vegetarian", "high-protein"],
+      name: "Smoothie bowl mango e cocco",
+      cho: 55, fat: 14, pro: 12, kcal: 390,
+      tags: ["vegetarian", "lactose-free", "high-carb"],
+      ingredients: [
+        { name: "Mango congelato", grams: 150 },
+        { name: "Banana", grams: 80 },
+        { name: "Bevanda cocco", grams: 150 },
+        { name: "Granola", grams: 30 },
+        { name: "Cocco rapè", grams: 10 },
+      ],
+    },
+    {
+      name: "Smoothie proteico banana e burro arachidi",
+      cho: 50, fat: 16, pro: 22, kcal: 430,
+      tags: ["vegetarian", "lactose-free", "high-protein"],
+      ingredients: [
+        { name: "Banana congelata", grams: 150 },
+        { name: "Proteine vegetali", grams: 25 },
+        { name: "Bevanda mandorla", grams: 200 },
+        { name: "Burro arachidi", grams: 20 },
+      ],
+    },
+    {
+      name: "Pancakes avena con sciroppo acero",
+      cho: 55, fat: 10, pro: 18, kcal: 380,
+      tags: ["vegetarian", "lactose-free", "high-carb"],
+      ingredients: [
+        { name: "Farina avena", grams: 60 },
+        { name: "Albume uovo", grams: 80 },
+        { name: "Banana", grams: 60 },
+        { name: "Sciroppo acero", grams: 25 },
+      ],
+    },
+    {
+      name: "Pancakes proteici con frutti di bosco",
+      cho: 48, fat: 8, pro: 25, kcal: 365,
+      tags: ["vegetarian", "lactose-free", "high-protein"],
+      ingredients: [
+        { name: "Farina avena", grams: 50 },
+        { name: "Proteine whey", grams: 20 },
+        { name: "Uovo intero", grams: 50 },
+        { name: "Frutti di bosco", grams: 80 },
+        { name: "Miele", grams: 15 },
+      ],
+    },
+    {
+      name: "Crema di riso con mandorle e cannella",
+      cho: 65, fat: 14, pro: 8, kcal: 410,
+      tags: ["vegetarian", "lactose-free", "gluten-free"],
+      ingredients: [
+        { name: "Crema di riso", grams: 80 },
+        { name: "Bevanda mandorla", grams: 200 },
+        { name: "Mandorle", grams: 20 },
+        { name: "Miele", grams: 15 },
+        { name: "Cannella", grams: 2 },
+      ],
+    },
+    {
+      name: "Chia pudding con mango",
+      cho: 45, fat: 15, pro: 12, kcal: 355,
+      tags: ["vegetarian", "lactose-free", "gluten-free"],
+      ingredients: [
+        { name: "Semi di chia", grams: 35 },
+        { name: "Bevanda cocco", grams: 200 },
+        { name: "Mango", grams: 100 },
+        { name: "Miele", grams: 10 },
+      ],
+    },
+    {
+      name: "Muesli con frutta secca",
+      cho: 60, fat: 12, pro: 10, kcal: 385,
+      tags: ["vegetarian", "lactose-free", "high-carb"],
+      ingredients: [
+        { name: "Muesli integrale", grams: 70 },
+        { name: "Bevanda avena", grams: 200 },
+        { name: "Noci", grams: 15 },
+        { name: "Uvetta", grams: 20 },
+      ],
+    },
+    {
+      name: "Fette biscottate con marmellata",
+      cho: 52, fat: 4, pro: 6, kcal: 265,
+      tags: ["vegetarian", "lactose-free", "high-carb"],
+      ingredients: [
+        { name: "Fette biscottate", grams: 50 },
+        { name: "Marmellata", grams: 30 },
+        { name: "Mela", grams: 100 },
+        { name: "Spremuta arancia", grams: 150 },
+      ],
+    },
+    {
+      name: "Crostata integrale con marmellata",
+      cho: 58, fat: 12, pro: 6, kcal: 360,
+      tags: ["vegetarian", "lactose-free", "high-carb"],
+      ingredients: [
+        { name: "Crostata integrale", grams: 80 },
+        { name: "Marmellata", grams: 20 },
+        { name: "Spremuta arancia", grams: 200 },
+      ],
+    },
+    {
+      name: "Torta di mele fatta in casa",
+      cho: 55, fat: 10, pro: 5, kcal: 330,
+      tags: ["vegetarian", "lactose-free", "high-carb"],
+      ingredients: [
+        { name: "Torta di mele", grams: 100 },
+        { name: "The verde", grams: 200 },
+        { name: "Mandorle", grams: 10 },
+      ],
+    },
+    // === COLAZIONI CON UOVA ===
+    {
+      name: "Uova strapazzate con pane tostato",
+      cho: 30, fat: 18, pro: 22, kcal: 370,
+      tags: ["vegetarian", "lactose-free", "high-protein"],
+      ingredients: [
+        { name: "Uova intere", grams: 120 },
+        { name: "Pane integrale tostato", grams: 50 },
+        { name: "Olio evo", grams: 10 },
+        { name: "Pomodorini", grams: 50 },
+      ],
+    },
+    {
+      name: "Omelette verdure e pane",
+      cho: 28, fat: 20, pro: 24, kcal: 390,
+      tags: ["vegetarian", "lactose-free", "high-protein"],
+      ingredients: [
+        { name: "Uova intere", grams: 120 },
+        { name: "Zucchine", grams: 50 },
+        { name: "Peperoni", grams: 40 },
+        { name: "Pane integrale", grams: 40 },
+        { name: "Olio evo", grams: 10 },
+      ],
+    },
+    {
+      name: "Uova in camicia con avocado toast",
+      cho: 32, fat: 24, pro: 18, kcal: 415,
+      tags: ["vegetarian", "lactose-free", "high-protein"],
+      ingredients: [
+        { name: "Uova", grams: 100 },
+        { name: "Pane integrale tostato", grams: 60 },
+        { name: "Avocado", grams: 70 },
+        { name: "Semi di sesamo", grams: 5 },
+      ],
+    },
+    {
+      name: "Frittata di albumi con spinaci",
+      cho: 12, fat: 10, pro: 28, kcal: 250,
+      tags: ["vegetarian", "lactose-free", "high-protein", "low-carb"],
+      ingredients: [
+        { name: "Albumi", grams: 150 },
+        { name: "Spinaci", grams: 80 },
+        { name: "Pane integrale", grams: 30 },
+        { name: "Olio evo", grams: 10 },
+      ],
+    },
+    // === COLAZIONI SALATE CON AFFETTATI ===
+    {
+      name: "Toast con prosciutto cotto e pomodoro",
+      cho: 35, fat: 12, pro: 20, kcal: 330,
+      tags: ["lactose-free", "high-protein"],
+      ingredients: [
+        { name: "Pane integrale tostato", grams: 60 },
+        { name: "Prosciutto cotto", grams: 60 },
+        { name: "Pomodoro", grams: 50 },
+        { name: "Olio evo", grams: 5 },
+      ],
+    },
+    {
+      name: "Pane con prosciutto crudo e melone",
+      cho: 40, fat: 8, pro: 18, kcal: 305,
+      tags: ["lactose-free", "high-protein"],
+      ingredients: [
+        { name: "Pane integrale", grams: 50 },
+        { name: "Prosciutto crudo", grams: 50 },
+        { name: "Melone", grams: 150 },
+      ],
+    },
+    {
+      name: "Bresaola con rucola e pane",
+      cho: 32, fat: 6, pro: 24, kcal: 280,
+      tags: ["lactose-free", "high-protein", "low-fat"],
+      ingredients: [
+        { name: "Pane integrale", grams: 50 },
+        { name: "Bresaola", grams: 60 },
+        { name: "Rucola", grams: 30 },
+        { name: "Olio evo", grams: 5 },
+        { name: "Limone", grams: 10 },
+      ],
+    },
+    {
+      name: "Pane tostato con salmone e avocado",
+      cho: 32, fat: 20, pro: 24, kcal: 400,
+      tags: ["lactose-free", "high-protein", "omega3"],
+      ingredients: [
+        { name: "Pane integrale tostato", grams: 60 },
+        { name: "Salmone affumicato", grams: 80 },
+        { name: "Avocado", grams: 60 },
+        { name: "Limone", grams: 10 },
+      ],
+    },
+    {
+      name: "Friselle con pomodoro e tonno",
+      cho: 45, fat: 12, pro: 22, kcal: 375,
+      tags: ["lactose-free", "high-protein"],
+      ingredients: [
+        { name: "Friselle integrali", grams: 60 },
+        { name: "Tonno al naturale", grams: 80 },
+        { name: "Pomodorini", grams: 100 },
+        { name: "Olio evo", grams: 10 },
+        { name: "Origano", grams: 2 },
+      ],
+    },
+    // === COLAZIONI CON YOGURT SENZA LATTOSIO ===
+    {
+      name: "Yogurt senza lattosio con granola",
+      cho: 48, fat: 10, pro: 15, kcal: 340,
+      tags: ["vegetarian", "lactose-free", "high-carb"],
+      ingredients: [
+        { name: "Yogurt senza lattosio", grams: 200 },
+        { name: "Granola", grams: 50 },
+        { name: "Miele", grams: 15 },
+        { name: "Fragole", grams: 50 },
+      ],
+    },
+    {
+      name: "Yogurt vegetale con frutta fresca",
+      cho: 42, fat: 8, pro: 10, kcal: 280,
+      tags: ["vegetarian", "vegan", "lactose-free"],
+      ingredients: [
+        { name: "Yogurt soia", grams: 200 },
+        { name: "Banana", grams: 80 },
+        { name: "Kiwi", grams: 60 },
+        { name: "Miele", grams: 10 },
+      ],
+    },
+    // === OPZIONI CON LATTICINI (per chi non ha intolleranze) ===
+    {
+      name: "Yogurt greco con muesli",
+      cho: 45, fat: 12, pro: 20, kcal: 370,
+      tags: ["vegetarian", "high-protein", "latticini"],
       ingredients: [
         { name: "Yogurt greco", grams: 200 },
         { name: "Muesli", grams: 50 },
@@ -682,31 +1019,13 @@ const MEAL_DATABASE: Record<
       ],
     },
     {
-      name: "Pancakes proteici con sciroppo d'acero",
-      cho: 55,
-      fat: 10,
-      pro: 25,
-      kcal: 410,
-      tags: ["vegetarian", "high-protein", "high-carb"],
+      name: "Cappuccino con cornetto integrale",
+      cho: 55, fat: 18, pro: 12, kcal: 430,
+      tags: ["vegetarian", "high-carb", "latticini"],
       ingredients: [
-        { name: "Farina d'avena", grams: 60 },
-        { name: "Albume d'uovo", grams: 100 },
-        { name: "Banana", grams: 80 },
-        { name: "Sciroppo d'acero", grams: 20 },
-      ],
-    },
-    {
-      name: "Crema di riso con miele e mandorle",
-      cho: 75,
-      fat: 13,
-      pro: 9,
-      kcal: 448,
-      tags: ["vegetarian", "gluten-free", "high-carb"],
-      ingredients: [
-        { name: "Crema di riso", grams: 100 },
-        { name: "Miele", grams: 20 },
-        { name: "Mandorle", grams: 20 },
-        { name: "Latte", grams: 150 },
+        { name: "Latte", grams: 200 },
+        { name: "Caffè", grams: 30 },
+        { name: "Cornetto integrale", grams: 70 },
       ],
     },
   ],
@@ -1292,6 +1611,37 @@ function NutritionPlan({ athleteData, userName }: NutritionPlanProps) {
   const [isLoading, setIsLoading] = useState(true)
   const [athleteConstraints, setAthleteConstraints] = useState<AthleteConstraintsData | null>(null)
   const [trainingPreferences, setTrainingPreferences] = useState<TrainingPreferences | null>(null)
+  const [aiSubstitutions, setAiSubstitutions] = useState<AISubstitution[]>([])
+  const [aiAdaptiveEnabled, setAiAdaptiveEnabled] = useState(false)
+  const [refreshTrigger, setRefreshTrigger] = useState(0) // Used to trigger data reload after AI changes
+  const [aiAdaptations, setAiAdaptations] = useState<{
+    nutrition?: {
+      daily_kcal: number
+      kcal_adjustment: number
+      cho_percent: number
+      pro_percent: number
+      fat_percent: number
+      notes: string[]
+    }
+    fueling?: {
+      pre_workout_cho_g: number
+      intra_workout_cho_g_per_hour: number
+      post_workout_cho_g: number
+      notes: string[]
+    }
+    training?: {
+      tss_adjustment_percent: number
+      max_zone: string
+      recommended_zone: string
+      notes: string[]
+    }
+    daily_state?: {
+      fatigue_score: number
+      glycogen_status: string
+      recovery_need: string
+      ai_notes: string
+    }
+  } | null>(null)
 
   const [weeklyFoodUsage, setWeeklyFoodUsage] = useState<WeeklyFoodUsage>({})
 
@@ -1372,9 +1722,9 @@ function NutritionPlan({ athleteData, userName }: NutritionPlanProps) {
           console.log("[v0] No metabolic profile found for athlete:", athleteId)
         }
 
-        const { data: constraintsData } = await supabase
+        const { data: constraintsData, error: constraintsError } = await supabase
           .from("athlete_constraints")
-          .select("intolerances, allergies, dietary_preferences, dietary_limits, notes")
+          .select("intolerances, allergies, dietary_preferences, dietary_limits")
           .eq("athlete_id", athleteId)
           .single()
 
@@ -1385,32 +1735,42 @@ function NutritionPlan({ athleteData, userName }: NutritionPlanProps) {
             allergies: constraintsData.allergies || [],
             dietary_preferences: constraintsData.dietary_preferences || [],
             dietary_limits: constraintsData.dietary_limits || [],
-            notes: constraintsData.notes || "", // Added notes
+            notes: "",
+            foods_to_avoid: [],
+            foods_to_include: [],
           })
-          console.log("[v0] Loaded athlete constraints:", {
-            intolerances: constraintsData.intolerances,
-            allergies: constraintsData.allergies,
-            dietary_preferences: constraintsData.dietary_preferences,
-          })
+  
+  // Build AI substitutions based on intolerances and allergies
+  const substitutions: AISubstitution[] = []
+  const allIssues = [
+    ...(constraintsData.intolerances || []),
+    ...(constraintsData.allergies || [])
+  ].map(i => i.toLowerCase())
+  
+  // Add substitutions based on detected issues
+  for (const [ingredient, sub] of Object.entries(INGREDIENT_SUBSTITUTIONS)) {
+    const reasonLower = sub.reason.toLowerCase()
+    // Check if any intolerance/allergy matches the substitution reason
+    if (allIssues.some(issue => 
+      reasonLower.includes(issue) || 
+      issue.includes('lattosio') && reasonLower.includes('lattosio') ||
+      issue.includes('glutine') && reasonLower.includes('glutine') ||
+      issue.includes('uova') && reasonLower.includes('uova') ||
+      issue.includes('frutta secca') && reasonLower.includes('frutta secca') ||
+      issue.includes('nichel') && reasonLower.includes('nichel')
+    )) {
+      substitutions.push({
+        original: ingredient,
+        substitute: sub.substitute,
+        reason: sub.reason
+      })
+    }
+  }
+  
+          setAiSubstitutions(substitutions)
 
-          // Parse sport supplements from notes
-          if (constraintsData.notes) {
-            try {
-              const notes =
-                typeof constraintsData.notes === "string" ? JSON.parse(constraintsData.notes) : constraintsData.notes
-
-              if (notes.sport_supplements) {
-                setSportSupplements({
-                  brands: notes.sport_supplements.brands || [],
-                  types: notes.sport_supplements.types || [],
-                })
-                console.log("[v0] Loaded sport supplements:", notes.sport_supplements)
-              }
-            } catch (e) {
-              console.log("[v0] Error parsing supplements notes:", e)
-            }
-          }
-        }
+  }
+  // Sport supplements are now loaded from config_json above
 
         // First try annual_training_plans
         const { data: annualPlan } = await supabase
@@ -1421,15 +1781,36 @@ function NutritionPlan({ athleteData, userName }: NutritionPlanProps) {
           .limit(1)
           .single()
 
-        if (annualPlan?.config_json?.training_preferences) {
-          const prefs = annualPlan.config_json.training_preferences
-          setTrainingPreferences({
-            preferred_training_time: prefs.preferred_training_time || "",
-            preferred_rest_days: prefs.preferred_rest_days || [],
-            coach_notes: prefs.coach_notes || "",
-          })
-          console.log("[v0] Loaded training preferences from annual_plan:", prefs)
-        } else {
+if (annualPlan?.config_json?.training_preferences) {
+  const prefs = annualPlan.config_json.training_preferences
+  setTrainingPreferences({
+  preferred_training_time: prefs.preferred_training_time || "",
+  preferred_rest_days: prefs.preferred_rest_days || [],
+  coach_notes: prefs.coach_notes || "",
+  })
+  }
+  
+  // Load sport supplements from config_json (saved in settings)
+  if (annualPlan?.config_json?.sport_supplements) {
+    const supps = annualPlan.config_json.sport_supplements
+    setSportSupplements({
+      brands: supps.brands || [],
+      types: supps.types || [],
+    })
+  }
+  
+  // Load AI adaptations from config_json
+  if (annualPlan?.config_json?.current_adaptations) {
+    const adaptations = annualPlan.config_json.current_adaptations
+    setAiAdaptations({
+      nutrition: adaptations.nutrition,
+      fueling: adaptations.fueling,
+      training: adaptations.training,
+      daily_state: annualPlan.config_json.daily_states?.[new Date().toISOString().split('T')[0]]
+    })
+  }
+  
+  if (!annualPlan?.config_json?.training_preferences) {
           // </CHANGE>
           // Fallback: try athlete_constraints.notes
           const { data: constraintsForPrefs } = await supabase
@@ -1449,12 +1830,12 @@ function NutritionPlan({ athleteData, userName }: NutritionPlanProps) {
                   coach_notes: prefs.coach_notes || "",
                 })
                 console.log("[v0] Loaded training preferences from athlete_constraints:", prefs)
-              }
-            } catch (e) {
-              console.log("[v0] Error parsing training preferences from notes:", e)
             }
+          } catch (e) {
+            // Error parsing training preferences from notes
           }
-          // </CHANGE>
+        }
+        // </CHANGE>
         }
 
         // Load activities for current week
@@ -1543,7 +1924,7 @@ function NutritionPlan({ athleteData, userName }: NutritionPlanProps) {
     }
 
     loadData()
-  }, [athleteId])
+  }, [athleteId, refreshTrigger]) // refreshTrigger forces reload after AI changes
 
   // Get zone consumption from metabolic profile or calculate it
   const getZoneConsumption = (zoneNumber: number): ZoneConsumption => {
@@ -1648,17 +2029,60 @@ function NutritionPlan({ athleteData, userName }: NutritionPlanProps) {
     return Math.round(370 + 21.6 * lbm)
   }, [weight])
 
-  // Calculate daily calories
+  // Calculate daily calories - apply AI adaptations if available
   const dailyKcal = useMemo(() => {
-    // BMR + 15% TEF + 40% of workout consumption for meals
-    return Math.round(bmr + bmr * 0.15 + workoutMetrics.kcal * 0.4)
-  }, [bmr, workoutMetrics.kcal])
+    // Base: BMR + 15% TEF (this is for REST days - no workout)
+    const restDayKcal = Math.round(bmr * 1.15)
+    
+    // For workout days: BMR + TEF + 40% workout kcal (60% comes from fueling)
+    const workoutDayKcal = Math.round(bmr * 1.15 + workoutMetrics.kcal * 0.4)
+    
+    // If AI adaptive is enabled, use AI's calculated daily_kcal (already includes adjustments)
+    if (aiAdaptiveEnabled && aiAdaptations?.nutrition?.daily_kcal) {
+      return aiAdaptations.nutrition.daily_kcal
+    }
+    
+    // Otherwise use local calculation based on whether there's a workout
+    return selectedActivity ? workoutDayKcal : restDayKcal
+  }, [bmr, workoutMetrics.kcal, aiAdaptations, aiAdaptiveEnabled, selectedActivity])
 
-  // Calculate intra-workout CHO
+  // Calculate intra-workout CHO - EMPATHY LOGIC based on zone and duration
   const intraWorkCho = useMemo(() => {
-    // 50% of CHO burned during workout
-    return Math.round(workoutMetrics.choBurned * 0.5)
-  }, [workoutMetrics.choBurned])
+    const zone = workoutMetrics.zone
+    const duration = workoutMetrics.duration
+    const durationHours = duration / 60
+    
+    // EMPATHY CHO/h rules based on intensity zone
+    let choPerHour = 0
+    
+    if (duration < 60) {
+      // Under 60 min: water is sufficient
+      choPerHour = 0
+    } else if (zone <= 2) {
+      // Z1-Z2 (Recovery/Endurance): 30g/h - fat oxidation prioritized
+      choPerHour = 30
+    } else if (zone <= 3) {
+      // Z3 (Tempo): 45g/h - mixed fuel
+      choPerHour = 45
+    } else if (zone <= 4) {
+      // Z4 (Threshold): 60g/h - glycolytic demand increasing
+      choPerHour = 60
+    } else if (zone === 5) {
+      // Z5 (VO2max): 75-90g/h - high glycolytic demand
+      choPerHour = 75
+    } else {
+      // Z6+ (Anaerobic): 90g/h max absorption
+      choPerHour = 90
+    }
+    
+    // Adjust for duration - longer sessions need more
+    if (duration > 180) {
+      choPerHour = Math.min(choPerHour * 1.2, 120) // Max 120g/h with trained gut
+    }
+    
+    const totalCho = Math.round(choPerHour * durationHours)
+    return totalCho
+  }, [workoutMetrics.zone, workoutMetrics.duration])
 
   // Determine fueling class based on zone and duration
   const fuelingClass = useMemo(() => {
@@ -1759,15 +2183,67 @@ function NutritionPlan({ athleteData, userName }: NutritionPlanProps) {
     const numIntervals = Math.floor((duration - fuelingStartTime) / intervalMinutes) + 1
     const choPerInterval = Math.round(totalCho / Math.max(numIntervals, 1))
 
-    // Get athlete's preferred products for rotation
-    const preferredBrands = sportSupplements.brands.length > 0 ? sportSupplements.brands : ["Enervit"]
-    const preferredTypes =
-      sportSupplements.types.length > 0 ? sportSupplements.types : ["gel", "barrette", "maltodestrine"]
-
-    // Build product pool for rotation
-    const productPool: { name: string; cho: number; brand: string; type: string }[] = []
-
-    for (const brand of preferredBrands) {
+  // Get athlete's preferred products for rotation
+  const preferredBrands = sportSupplements.brands.length > 0 ? sportSupplements.brands : ["Enervit"]
+  const preferredTypes =
+  sportSupplements.types.length > 0 ? sportSupplements.types : ["gel", "barrette", "maltodestrine"]
+  
+  // Build product pool from REAL SUPPLEMENTS DATABASE
+  const productPool: { name: string; cho: number; brand: string; type: string }[] = []
+  
+  // Get athlete constraints for filtering
+  const isLactoseIntolerant = athleteConstraints?.intolerances?.some(i => i.toLowerCase().includes('lattosio')) || false
+  const isGlutenIntolerant = athleteConstraints?.intolerances?.some(i => i.toLowerCase().includes('glutine')) || athleteConstraints?.allergies?.some(a => a.toLowerCase().includes('glutine')) || false
+  const isVegan = athleteConstraints?.dietary_preferences?.some(p => p.toLowerCase().includes('vegan')) || false
+  
+  // Get compatible products from real database
+  const compatibleProducts = getCompatibleProducts(
+    SUPPLEMENTS_DATABASE.filter(p => p.type === 'intra_workout'),
+    {
+      is_lactose_intolerant: isLactoseIntolerant,
+      is_gluten_intolerant: isGlutenIntolerant,
+      is_vegan: isVegan
+    }
+  )
+  
+  // Filter by preferred brands (case-insensitive matching)
+  const brandProducts = compatibleProducts.filter(p => 
+    preferredBrands.some(b => 
+      b.toLowerCase() === p.brand.toLowerCase() ||
+      b.toLowerCase().includes(p.brand.toLowerCase()) ||
+      p.brand.toLowerCase().includes(b.toLowerCase())
+    )
+  )
+  
+  // Add products from real database to pool
+  for (const product of brandProducts) {
+    // Match product category to preferred types
+    const categoryMatch = preferredTypes.some(type => {
+      const typeLower = type.toLowerCase()
+      const categoryLower = product.category.toLowerCase()
+      const tagsLower = product.tags.map(t => t.toLowerCase())
+      return categoryLower.includes(typeLower) || 
+             tagsLower.some(tag => tag.includes(typeLower)) ||
+             (typeLower === 'gel' && categoryLower === 'gel') ||
+             (typeLower === 'maltodestrine' && tagsLower.includes('maltodestrine')) ||
+             (typeLower === 'carbo in polvere' && categoryLower === 'polvere') ||
+             (typeLower === 'barrette energetiche' && categoryLower === 'barretta') ||
+             (typeLower === 'elettroliti' && product.features.has_electrolytes)
+    })
+    
+    if (categoryMatch || preferredTypes.length === 0) {
+      productPool.push({
+        name: product.name,
+        cho: product.nutrition.cho_g,
+        brand: product.brand.charAt(0).toUpperCase() + product.brand.slice(1),
+        type: product.category
+      })
+    }
+  }
+  
+  // Fallback to old static mapping if no products found
+  if (productPool.length === 0) {
+  for (const brand of preferredBrands) {
       const brandProducts = BRAND_PRODUCTS[brand]
       if (!brandProducts) continue
 
@@ -1790,14 +2266,15 @@ function NutritionPlan({ athleteData, userName }: NutritionPlanProps) {
         productPool.push({ name: brandProducts.maltodestrine[0].name, cho: 30, brand, type: "maltodestrina" })
       }
 
-      // Add carbo powder
-      if (preferredTypes.includes("carbo-polvere") && brandProducts["carbo-polvere"]) {
-        productPool.push({ name: brandProducts["carbo-polvere"][0].name, cho: 30, brand, type: "drink" })
-      }
-    }
-
-    // Fallback if no products found
-    if (productPool.length === 0) {
+    // Add carbo powder
+  if (preferredTypes.includes("carbo-polvere") && brandProducts["carbo-polvere"]) {
+  productPool.push({ name: brandProducts["carbo-polvere"][0].name, cho: 30, brand, type: "drink" })
+  }
+  }
+  } // Close the first fallback if (productPool.length === 0)
+  
+  // Ultimate fallback if still no products found
+  if (productPool.length === 0) {
       productPool.push(
         { name: "Gel energetico", cho: 25, brand: "Generico", type: "gel" },
         { name: "Barretta energetica", cho: 30, brand: "Generico", type: "barretta" },
@@ -1837,7 +2314,7 @@ function NutritionPlan({ athleteData, userName }: NutritionPlanProps) {
     }
 
     return intervals
-  }, [selectedActivity, workoutMetrics.duration, intraWorkCho, sportSupplements, trainingPreferences])
+  }, [selectedActivity, workoutMetrics.duration, intraWorkCho, sportSupplements, trainingPreferences, athleteConstraints])
 
   // Placeholder for intraWorkoutStack, as intraWorkoutTiming now shows the details
   const intraWorkoutStack = useMemo(() => {
@@ -1897,14 +2374,16 @@ function NutritionPlan({ athleteData, userName }: NutritionPlanProps) {
       })
     }
 
-    // Carboidrati post per ripristino glicogeno
-    if (choBurned > 50) {
-      const choToRestore = Math.round(choBurned * 0.8) // 80% dei CHO bruciati
-      stack.push({
-        name: "Carboidrati",
-        dose: `${choToRestore}g`,
-        note: "Riso, pasta, patate, frutta per ripristino glicogeno",
-        timing: "Entro 2h",
+// Carboidrati post per ripristino glicogeno - EMPATHY: basato su peso, non CHO bruciati
+  if (choBurned > 50) {
+  // 0.8-1.2g/kg in base alla zona: Z5+ = 1.2, Z4 = 1.0, Z3 = 0.8, Z2 = 0.5
+  const choPerKg = zone >= 5 ? 1.2 : zone >= 4 ? 1.0 : zone >= 3 ? 0.8 : 0.5
+  const choToRestore = Math.round(weight * choPerKg)
+  stack.push({
+  name: "Carboidrati",
+  dose: `${choToRestore}g`,
+  note: `${choPerKg}g/kg - Riso, pasta, patate, frutta`,
+  timing: "Entro 2h",
       })
     }
 
@@ -1937,64 +2416,48 @@ function NutritionPlan({ athleteData, userName }: NutritionPlanProps) {
     const weekPlan: Record<number, typeof mealPlan> = {}
     const usedFoods: WeeklyFoodUsage = {}
 
-    // Get tags to exclude based on constraints
-    const excludedTags: string[] = []
-    athleteConstraints?.intolerances.forEach((intol) => {
-      const tags = CONSTRAINT_TAG_MAP[intol]
-      if (tags) excludedTags.push(...tags)
-    })
-    athleteConstraints?.allergies.forEach((allergy) => {
-      const tags = CONSTRAINT_TAG_MAP[allergy]
-      if (tags) excludedTags.push(...tags)
-    })
-    athleteConstraints?.dietary_preferences.forEach((pref) => {
-      const tags = CONSTRAINT_TAG_MAP[pref]
-      if (tags) excludedTags.push(...tags)
-    })
+  // APPROCCIO CLASSICO: Nessun filtro sui pasti
+  // Le intolleranze vengono segnalate come avviso nel report
+  const filterMeals = (meals: typeof MEAL_DATABASE.colazione) => meals
 
-    // Filter meals that don't contain excluded tags
-    const filterMeals = (meals: typeof MEAL_DATABASE.colazione) => {
-      return meals.filter((meal) => !meal.tags.some((tag) => excludedTags.includes(tag)))
-    }
-
-    // Select a meal that hasn't been used too much this week
-    const selectMealWithRotation = (meals: typeof MEAL_DATABASE.colazione, mealType: string, targetKcal: number) => {
-      // Initialize usage tracking for this meal type
-      if (!usedFoods[mealType]) {
-        usedFoods[mealType] = {}
-      }
-
-      // Filter out meals used too many times
-      const availableMeals = meals.filter((meal) => {
-        const timesUsed = usedFoods[mealType][meal.name] || 0
-        return timesUsed < MAX_WEEKLY_REPETITIONS
+  // EMPATHY meal selection: rotazione + adattamento al tipo di giornata
+  const selectMealWithRotation = (meals: typeof MEAL_DATABASE.colazione, mealType: string, targetKcal: number, dayIndex: number, workoutType: string) => {
+    // Prioritize meals based on workout type
+    let filteredMeals = [...meals]
+    
+    // High intensity days: prefer high-carb meals
+    if (workoutType === 'high_intensity' || workoutType === 'intervals') {
+      filteredMeals.sort((a, b) => {
+        const aHighCarb = a.tags?.includes('high-carb') ? 1 : 0
+        const bHighCarb = b.tags?.includes('high-carb') ? 1 : 0
+        return bHighCarb - aHighCarb
       })
-
-      // If all meals exhausted, reset and use all (shouldn't happen with 7+ options)
-      const mealsToChoose = availableMeals.length > 0 ? availableMeals : meals
-
-      // Sort by how close they are to target, with preference for less used
-      const sortedMeals = [...mealsToChoose].sort((a, b) => {
-        const aDiff = Math.abs(a.kcal - targetKcal)
-        const bDiff = Math.abs(b.kcal - targetKcal)
-        const aUsed = usedFoods[mealType][a.name] || 0
-        const bUsed = usedFoods[mealType][b.name] || 0
-
-        // Prioritize less used foods, then by calorie match
-        if (aUsed !== bUsed) return aUsed - bUsed
-        return aDiff - bDiff
-      })
-
-      const selectedMeal = sortedMeals[0]
-
-      // Track usage
-      usedFoods[mealType][selectedMeal.name] = (usedFoods[mealType][selectedMeal.name] || 0) + 1
-
-      return selectedMeal
     }
+    // Endurance days: prefer balanced or high-fat meals for fat adaptation
+    else if (workoutType === 'endurance' || workoutType === 'long') {
+      filteredMeals.sort((a, b) => {
+        const aBalanced = a.tags?.includes('balanced') || a.tags?.includes('omega3') ? 1 : 0
+        const bBalanced = b.tags?.includes('balanced') || b.tags?.includes('omega3') ? 1 : 0
+        return bBalanced - aBalanced
+      })
+    }
+    // Recovery/rest days: prefer high-protein, moderate carb
+    else if (workoutType === 'recovery' || workoutType === 'rest') {
+      filteredMeals.sort((a, b) => {
+        const aProtein = a.tags?.includes('high-protein') ? 1 : 0
+        const bProtein = b.tags?.includes('high-protein') ? 1 : 0
+        return bProtein - aProtein
+      })
+    }
+    
+    // Apply rotation offset based on day + mealType for variety
+    const mealTypeOffset = mealType.charCodeAt(0) % 5
+    const rotationIndex = (dayIndex + mealTypeOffset) % filteredMeals.length
+    return filteredMeals[rotationIndex]
+  }
 
-    // Generate plan for each day of the week
-    for (let dayIndex = 0; dayIndex < 7; dayIndex++) {
+  // Generate plan for each day of the week
+  for (let dayIndex = 0; dayIndex < 7; dayIndex++) {
       const dayActivity = weeklyActivities.find((a) => a.day_of_week === dayIndex)
       const workoutType = getWorkoutType(dayActivity)
       // Use scheduled_time from the activity if available, otherwise infer from meal timing logic
@@ -2003,7 +2466,7 @@ function NutritionPlan({ athleteData, userName }: NutritionPlanProps) {
         : dayActivity?.activity_date
           ? new Date(dayActivity.activity_date).toTimeString().substring(0, 5)
           : null
-      const { meals: calculatedMeals, profile: workoutProfile } = calculateMealTiming(workoutTime, workoutType)
+      const { meals: calculatedMeals, profile: workoutProfile } = calculateMealTiming(workoutTime, workoutType, trainingPreferences?.preferred_training_time)
 
       // Calculate daily kcal for this specific day
       let dayWorkoutKcal = 0
@@ -2044,10 +2507,10 @@ function NutritionPlan({ athleteData, userName }: NutritionPlanProps) {
         const dbKey = mealType === "merenda" ? "spuntino" : mealType
         const filteredMeals = filterMeals(MEAL_DATABASE[dbKey] || MEAL_DATABASE.spuntino)
 
-        if (filteredMeals.length > 0) {
-          const targetKcal = dayDailyKcal * config.pct
-          const selectedMeal = selectMealWithRotation(filteredMeals, mealType, targetKcal)
-          const scale = targetKcal / selectedMeal.kcal
+  if (filteredMeals.length > 0) {
+  const targetKcal = dayDailyKcal * config.pct
+  const selectedMeal = selectMealWithRotation(filteredMeals, mealType, targetKcal, dayIndex, workoutType)
+  const scale = targetKcal / selectedMeal.kcal
 
           const scaledIngredients = selectedMeal.ingredients.map((ing) => ({
             name: ing.name,
@@ -2074,14 +2537,161 @@ function NutritionPlan({ athleteData, userName }: NutritionPlanProps) {
     setWeeklyFoodUsage(usedFoods)
 
     return weekPlan
-  }, [bmr, weeklyActivities, athleteConstraints, metabolicProfile, dailyKcal, calculateMealTiming])
+  }, [bmr, weeklyActivities, athleteConstraints, metabolicProfile, dailyKcal, calculateMealTiming, trainingPreferences])
 
-  // Get meal plan for selected day
+  // Get meal plan for selected day - AI substitutions are applied inline to ingredients during rendering
   const mealPlan = useMemo(() => {
-    return weeklyMealPlan[selectedDay] || []
+    const dayMeals = weeklyMealPlan[selectedDay] || []
+    // Filter out pre_workout meals as they are shown in the Fueling tab
+    return dayMeals.filter((meal: any) =>
+      !meal.meal?.toLowerCase().includes('pre-workout') &&
+      meal.type !== 'pre_workout'
+    )
   }, [weeklyMealPlan, selectedDay])
 
   const dayNames = ["Lun", "Mar", "Mer", "Gio", "Ven", "Sab", "Dom"]
+
+  // Categorie ingredienti per organizzare la lista della spesa
+  const INGREDIENT_CATEGORIES: Record<string, string[]> = {
+    "Latticini e Uova": ["latte", "yogurt", "formaggio", "uova", "burro", "panna", "ricotta", "mozzarella", "parmigiano", "grana", "albume"],
+    "Carne e Pesce": ["pollo", "tacchino", "manzo", "maiale", "salmone", "tonno", "bresaola", "prosciutto", "cotto", "crudo", "pesce"],
+    "Frutta": ["banana", "mela", "arancia", "fragole", "frutti di bosco", "mirtilli", "kiwi", "mango", "pesca", "uva", "limone", "frutta"],
+    "Verdura": ["spinaci", "broccoli", "zucchine", "pomodoro", "peperoni", "carote", "insalata", "rucola", "cipolla", "aglio", "verdure", "patate"],
+    "Cereali e Pane": ["pane", "pasta", "riso", "avena", "fiocchi", "farina", "cereali", "muesli", "fette biscottate", "crackers", "quinoa", "orzo"],
+    "Legumi e Proteine Vegetali": ["fagioli", "lenticchie", "ceci", "tofu", "tempeh", "edamame", "piselli"],
+    "Frutta Secca e Semi": ["mandorle", "noci", "nocciole", "semi di chia", "semi di lino", "arachidi", "burro di arachidi", "uvetta"],
+    "Condimenti e Oli": ["olio", "evo", "aceto", "sale", "pepe", "spezie", "miele", "marmellata", "sciroppo", "salsa"],
+    "Bevande": ["caffè", "tè", "succo", "latte di mandorla", "latte di soia", "latte di avena", "latte di cocco"],
+    "Altro": []
+  }
+
+  // Genera lista della spesa aggregando tutti gli ingredienti della settimana
+  const generateShoppingList = useMemo(() => {
+    const ingredientMap: Record<string, { grams: number; category: string }> = {}
+    
+    // Itera su tutti i giorni della settimana
+    for (let day = 0; day < 7; day++) {
+      const dayMeals = weeklyMealPlan[day] || []
+      
+      for (const meal of dayMeals) {
+        if (meal.ingredients) {
+          for (const ing of meal.ingredients) {
+            const ingName = ing.name.toLowerCase()
+            
+            // Trova la categoria
+            let category = "Altro"
+            for (const [cat, keywords] of Object.entries(INGREDIENT_CATEGORIES)) {
+              if (keywords.some(kw => ingName.includes(kw))) {
+                category = cat
+                break
+              }
+            }
+            
+            // Aggrega le quantita
+            const key = ing.name
+            if (ingredientMap[key]) {
+              ingredientMap[key].grams += ing.grams
+            } else {
+              ingredientMap[key] = { grams: ing.grams, category }
+            }
+          }
+        }
+      }
+    }
+    
+    // Organizza per categoria
+    const byCategory: Record<string, { name: string; grams: number }[]> = {}
+    for (const [name, data] of Object.entries(ingredientMap)) {
+      if (!byCategory[data.category]) {
+        byCategory[data.category] = []
+      }
+      byCategory[data.category].push({ name, grams: Math.round(data.grams) })
+    }
+    
+    // Ordina ingredienti per quantita decrescente in ogni categoria
+    for (const cat of Object.keys(byCategory)) {
+      byCategory[cat].sort((a, b) => b.grams - a.grams)
+    }
+    
+    return byCategory
+  }, [weeklyMealPlan])
+
+  // Genera PDF della lista della spesa
+  const generateShoppingListPDF = () => {
+    const shoppingList = generateShoppingList
+    
+    // Crea contenuto HTML per il PDF
+    let htmlContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <title>Lista della Spesa - EMPATHY</title>
+        <style>
+          body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 40px; background: #f5f5f5; }
+          .container { max-width: 800px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+          h1 { color: #1a1a2e; border-bottom: 3px solid #6366f1; padding-bottom: 10px; }
+          h2 { color: #4f46e5; margin-top: 25px; font-size: 18px; }
+          .category { margin-bottom: 20px; }
+          .item { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px dashed #e5e5e5; }
+          .item-name { color: #333; }
+          .item-qty { color: #6366f1; font-weight: bold; min-width: 80px; text-align: right; }
+          .checkbox { width: 18px; height: 18px; border: 2px solid #6366f1; border-radius: 3px; margin-right: 10px; }
+          .footer { margin-top: 30px; padding-top: 20px; border-top: 1px solid #e5e5e5; color: #666; font-size: 12px; text-align: center; }
+          .date { color: #999; font-size: 14px; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <h1>Lista della Spesa Settimanale</h1>
+          <p class="date">Generata il ${new Date().toLocaleDateString('it-IT', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
+    `
+    
+    // Ordine categorie
+    const categoryOrder = ["Frutta", "Verdura", "Carne e Pesce", "Latticini e Uova", "Cereali e Pane", "Legumi e Proteine Vegetali", "Frutta Secca e Semi", "Condimenti e Oli", "Bevande", "Altro"]
+    
+    for (const category of categoryOrder) {
+      const items = shoppingList[category]
+      if (items && items.length > 0) {
+        htmlContent += `
+          <div class="category">
+            <h2>${category}</h2>
+        `
+        for (const item of items) {
+          const qty = item.grams >= 1000 ? `${(item.grams / 1000).toFixed(1)} kg` : `${item.grams} g`
+          htmlContent += `
+            <div class="item">
+              <div style="display: flex; align-items: center;">
+                <div class="checkbox"></div>
+                <span class="item-name">${item.name}</span>
+              </div>
+              <span class="item-qty">${qty}</span>
+            </div>
+          `
+        }
+        htmlContent += `</div>`
+      }
+    }
+    
+    htmlContent += `
+          <div class="footer">
+            <p>EMPATHY Performance Nutrition - Piano personalizzato</p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `
+    
+    // Apri in nuova finestra per stampa/PDF
+    const printWindow = window.open('', '_blank')
+    if (printWindow) {
+      printWindow.document.write(htmlContent)
+      printWindow.document.close()
+      setTimeout(() => {
+        printWindow.print()
+      }, 500)
+    }
+  }
 
   const micronutrientAnalysis = useMemo(() => {
     // Simplified estimation based on meal composition
@@ -2114,13 +2724,14 @@ function NutritionPlan({ athleteData, userName }: NutritionPlanProps) {
   const dailySupplementStack = useMemo(() => {
     const stack = [...DAILY_SUPPLEMENT_STACK.base]
     const workoutType = selectedActivity ? getWorkoutType(selectedActivity) : "rest"
-    const { meals: calculatedMeals, profile: workoutProfile } = calculateMealTiming(
-      selectedActivity?.scheduled_time || // Use scheduled_time if available
-        selectedActivity?.activity_date
-        ? new Date(selectedActivity.activity_date).toTimeString().substring(0, 5)
-        : null,
-      workoutType,
-    )
+const { meals: calculatedMeals, profile: workoutProfile } = calculateMealTiming(
+  selectedActivity?.scheduled_time || // Use scheduled_time if available
+  selectedActivity?.activity_date
+  ? new Date(selectedActivity.activity_date).toTimeString().substring(0, 5)
+  : null,
+  workoutType,
+  trainingPreferences?.preferred_training_time, // Athlete's preferred training slot as fallback
+  )
 
     const preWorkoutMeal = calculatedMeals.find((m) => m.type === "pre_workout")
     const postWorkoutMeal = calculatedMeals.find((m) => m.type === "post_workout")
@@ -2341,21 +2952,76 @@ function NutritionPlan({ athleteData, userName }: NutritionPlanProps) {
           <Card className="col-span-1 md:col-span-2 lg:col-span-3">
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle>BioMap & Nutrition Plan</CardTitle>
-              {athleteData?.id && (
-                <AIAnalysisButton
-                  athleteId={athleteData.id}
-                  endpoint="nutrition"
-                  buttonText="AI Consigli"
-                  context="Analisi nutrizionale completa con focus su timing, allergie, interazioni microbioma"
-                />
-              )}
+  {athleteData?.id && (
+    <div className="flex gap-2 items-center">
+      <Button
+        variant={aiAdaptiveEnabled ? "default" : "outline"}
+        size="sm"
+        onClick={async () => {
+          if (aiAdaptiveEnabled) {
+            // Disable AI adaptive
+            setAiAdaptiveEnabled(false)
+            setAiAdaptations(null)
+          } else {
+            // Enable and calculate
+            try {
+              const response = await fetch('/api/ai/adaptive-engine', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  athleteId: athleteData.id,
+                  action: 'calculate'
+                })
+              })
+              const data = await response.json()
+              if (data.success) {
+                setAiAdaptiveEnabled(true)
+                setAiAdaptations({
+                  nutrition: data.adaptations?.nutrition,
+                  fueling: data.adaptations?.fueling,
+                  training: data.adaptations?.training,
+                  daily_state: data.state
+                })
+              }
+            } catch (error) {
+              console.error('[v0] Error calculating AI state:', error)
+            }
+          }
+        }}
+        className={aiAdaptiveEnabled 
+          ? "bg-cyan-600 hover:bg-cyan-700 text-white" 
+          : "border-cyan-500/50 text-cyan-400 hover:bg-cyan-500/10"
+        }
+      >
+        <Activity className="h-4 w-4 mr-1" />
+        {aiAdaptiveEnabled ? "AI Attivo" : "AI Adattivo"}
+      </Button>
+  <AIAnalysisButton
+  athleteId={athleteData.id}
+  endpoint="nutrition"
+  buttonText="AI Consigli"
+  context="Analisi nutrizionale completa con focus su timing, allergie, interazioni microbioma"
+  onApplied={() => setRefreshTrigger(prev => prev + 1)}
+  />
+  <Button
+    variant="outline"
+    size="sm"
+    onClick={generateShoppingListPDF}
+    className="border-green-500/50 text-green-400 hover:bg-green-500/10 bg-transparent"
+  >
+    <ShoppingCart className="h-4 w-4 mr-1" />
+    Lista Spesa
+  </Button>
+  </div>
+  )}
             </CardHeader>
             <CardContent>
-              <Tabs defaultValue={activeTab} onValueChange={(value) => setActiveTab(value)}>
-                <TabsList className="grid w-full grid-cols-2">
-                  <TabsTrigger value="biomap">BioMap</TabsTrigger>
-                  <TabsTrigger value="nutrition">Nutrition Plan</TabsTrigger>
-                </TabsList>
+<Tabs defaultValue={activeTab} onValueChange={(value) => setActiveTab(value)}>
+                  <TabsList className="grid w-full grid-cols-3">
+                    <TabsTrigger value="biomap">BioMap</TabsTrigger>
+                    <TabsTrigger value="nutrition">Nutrition Plan</TabsTrigger>
+                    <TabsTrigger value="fueling">Fueling</TabsTrigger>
+                  </TabsList>
                 <TabsContent value="biomap">
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {/* Metabolic Profile */}
@@ -2469,8 +3135,188 @@ function NutritionPlan({ athleteData, userName }: NutritionPlanProps) {
                   </div>
                 </TabsContent>
 
-                <TabsContent value="nutrition">
-                  <div className="flex justify-between items-center mb-4">
+<TabsContent value="nutrition">
+  {/* Banner Avviso Intolleranze */}
+  {(athleteConstraints?.intolerances?.length > 0 || athleteConstraints?.allergies?.length > 0) && (
+    <div className="mb-4 p-3 rounded-lg bg-amber-500/10 border border-amber-500/30">
+      <div className="flex items-center gap-2">
+        <Pill className="h-5 w-5 text-amber-400" />
+        <span className="font-semibold text-amber-400">Avviso Intolleranze/Allergie</span>
+      </div>
+      <p className="text-sm text-muted-foreground mt-2">
+        Ricorda di assumere cibi{' '}
+        {athleteConstraints?.intolerances?.map((i, idx) => (
+          <span key={idx}>
+            <strong className="text-amber-300">senza {i.toLowerCase()}</strong>
+            {idx < (athleteConstraints?.intolerances?.length || 0) - 1 ? ', ' : ''}
+          </span>
+        ))}
+        {athleteConstraints?.allergies?.length > 0 && athleteConstraints?.intolerances?.length > 0 && ' e '}
+        {athleteConstraints?.allergies?.map((a, idx) => (
+          <span key={idx}>
+            <strong className="text-red-300">evitare {a.toLowerCase()}</strong>
+            {idx < (athleteConstraints?.allergies?.length || 0) - 1 ? ', ' : ''}
+          </span>
+        ))}
+        . Le ricette mostrate sono indicative - sostituire gli ingredienti non compatibili.
+      </p>
+    </div>
+  )}
+
+  {/* EMPATHY Daily State Panel - Dynamic values based on selected day workout */}
+  {selectedActivity ? (
+    <div className="mb-4 p-4 rounded-lg bg-gradient-to-r from-cyan-900/20 to-blue-900/20 border border-cyan-500/30">
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <Sparkles className="h-5 w-5 text-cyan-400" />
+          <span className="font-semibold text-cyan-400">EMPATHY - {dayNames[selectedDay]}</span>
+        </div>
+        <div className="flex gap-2">
+          <Badge variant="outline" className={`
+            ${workoutMetrics.zone >= 5 ? 'border-red-500 text-red-400' :
+              workoutMetrics.zone >= 4 ? 'border-orange-500 text-orange-400' :
+              workoutMetrics.zone >= 3 ? 'border-yellow-500 text-yellow-400' :
+              'border-green-500 text-green-400'}
+          `}>
+            Zone: Z{workoutMetrics.zone}
+          </Badge>
+          <Badge variant="outline" className={`
+            ${workoutMetrics.kcal > 1500 ? 'border-red-500 text-red-400' :
+              workoutMetrics.kcal > 800 ? 'border-orange-500 text-orange-400' :
+              'border-green-500 text-green-400'}
+          `}>
+            {workoutMetrics.kcal > 1500 ? 'High Load' : workoutMetrics.kcal > 800 ? 'Medium Load' : 'Low Load'}
+          </Badge>
+        </div>
+      </div>
+      
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
+        <div className="text-center p-2 bg-background/50 rounded">
+          <div className="text-xs text-muted-foreground">Workout Kcal</div>
+          <div className={`text-lg font-bold ${
+            workoutMetrics.kcal > 1500 ? 'text-red-400' :
+            workoutMetrics.kcal > 800 ? 'text-orange-400' : 'text-green-400'
+          }`}>
+            {workoutMetrics.kcal}
+          </div>
+        </div>
+        <div className="text-center p-2 bg-background/50 rounded">
+          <div className="text-xs text-muted-foreground">Kcal Totali</div>
+          <div className="text-lg font-bold text-cyan-400">
+            {dailyKcal + workoutMetrics.kcal}
+            <span className="text-xs ml-1 text-green-400">
+              (+{workoutMetrics.kcal})
+            </span>
+          </div>
+        </div>
+        <div className="text-center p-2 bg-background/50 rounded">
+          <div className="text-xs text-muted-foreground">CHO</div>
+          <div className="text-lg font-bold">
+            {workoutMetrics.zone >= 4 ? '60%' : workoutMetrics.zone >= 3 ? '55%' : '50%'}
+          </div>
+        </div>
+        <div className="text-center p-2 bg-background/50 rounded">
+          <div className="text-xs text-muted-foreground">PRO</div>
+          <div className="text-lg font-bold">
+            {workoutMetrics.zone >= 5 ? '25%' : '20%'}
+          </div>
+        </div>
+      </div>
+      
+      <p className="text-sm text-muted-foreground">
+        {workoutMetrics.zone >= 5 
+          ? `Alta intensita Z${workoutMetrics.zone}: Priorita CHO per performance, aumenta proteine per recupero muscolare.`
+          : workoutMetrics.zone >= 4
+          ? `Soglia Z${workoutMetrics.zone}: Bilancia CHO e grassi, focus su recupero post-workout.`
+          : workoutMetrics.zone >= 3
+          ? `Tempo Z${workoutMetrics.zone}: Sessione moderata, alimentazione bilanciata.`
+          : workoutMetrics.duration > 120
+          ? `Endurance Z${workoutMetrics.zone} lunga (${workoutMetrics.duration}min): Fat adaptation, CHO moderati, aumenta intake durante.`
+          : `Endurance Z${workoutMetrics.zone}: Fat oxidation prioritaria, CHO moderati.`
+        }
+      </p>
+      
+      <div className="mt-2 flex flex-wrap gap-1">
+        <Badge variant="secondary" className="text-xs bg-cyan-900/30">
+          CHO bruciati: {workoutMetrics.choBurned}g
+        </Badge>
+        <Badge variant="secondary" className="text-xs bg-cyan-900/30">
+          Fat bruciati: {workoutMetrics.fatBurned}g
+        </Badge>
+        {workoutMetrics.duration > 90 && (
+          <Badge variant="secondary" className="text-xs bg-yellow-900/30">
+            Sessione lunga: rifornimento necessario
+          </Badge>
+        )}
+  </div>
+  </div>
+  ) : (
+    <div className="mb-4 p-4 rounded-lg bg-gradient-to-r from-green-900/20 to-teal-900/20 border border-green-500/30">
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <Sparkles className="h-5 w-5 text-green-400" />
+          <span className="font-semibold text-green-400">EMPATHY - {dayNames[selectedDay]} (Riposo)</span>
+        </div>
+        <Badge variant="outline" className="border-green-500 text-green-400">
+          Giorno di Recupero
+        </Badge>
+      </div>
+      
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-3">
+        <div className="text-center p-2 bg-background/50 rounded">
+          <div className="text-xs text-muted-foreground">Kcal Giornaliere</div>
+          <div className="text-lg font-bold text-green-400">
+            {dailyKcal}
+          </div>
+        </div>
+        <div className="text-center p-2 bg-background/50 rounded">
+          <div className="text-xs text-muted-foreground">CHO</div>
+          <div className="text-lg font-bold">40%</div>
+        </div>
+        <div className="text-center p-2 bg-background/50 rounded">
+          <div className="text-xs text-muted-foreground">PRO</div>
+          <div className="text-lg font-bold">25%</div>
+        </div>
+      </div>
+      
+      <p className="text-sm text-muted-foreground">
+        Giorno di riposo: focus su recupero e riparazione muscolare. Proteine elevate, carboidrati moderati, grassi sani.
+        Nessun fueling pre/intra/post workout necessario.
+      </p>
+    </div>
+  )}
+  
+  {/* AI Ingredient Substitutions Panel */}
+  {aiSubstitutions.length > 0 && (
+  <div className="mb-4 p-3 rounded-lg bg-gradient-to-r from-cyan-500/10 to-blue-500/10 border border-cyan-500/20">
+      <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center gap-2">
+          <Sparkles className="h-4 w-4 text-cyan-400" />
+          <span className="text-sm font-medium text-cyan-400">Correzioni AI Attive ({aiSubstitutions.length})</span>
+        </div>
+        <Badge variant="outline" className="border-cyan-500/50 text-cyan-400 text-xs">
+          Personalizzato
+        </Badge>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        {aiSubstitutions.slice(0, 6).map((sub, idx) => (
+          <div key={idx} className="flex items-center gap-1 text-xs bg-background/50 px-2 py-1 rounded">
+            <span className="line-through text-red-400/70">{sub.original}</span>
+            <span className="text-muted-foreground">→</span>
+            <span className="text-cyan-400">{sub.substitute}</span>
+          </div>
+        ))}
+        {aiSubstitutions.length > 6 && (
+          <span className="text-xs text-muted-foreground">+{aiSubstitutions.length - 6} altre</span>
+        )}
+      </div>
+      <p className="text-xs text-muted-foreground mt-2">
+        Basate su: {athleteConstraints?.intolerances?.join(", ") || ""} {athleteConstraints?.allergies?.join(", ") || ""}
+      </p>
+    </div>
+  )}
+  
+  <div className="flex justify-between items-center mb-4">
                     <div className="flex items-center gap-2">
                       {dayNames.map((day, index) => (
                         <Button
@@ -2504,10 +3350,10 @@ function NutritionPlan({ athleteData, userName }: NutritionPlanProps) {
                     mealPlan.map((meal, index) => (
                       <Card key={index} className="mb-4">
                         <CardHeader>
-                          <CardTitle className="flex items-center gap-2">
-                            {meal.meal}
-                            <Badge variant="secondary">{meal.time}</Badge>
-                          </CardTitle>
+  <CardTitle className="flex items-center gap-2">
+  {meal.meal}
+  <Badge variant="secondary">{meal.time}</Badge>
+  </CardTitle>
                         </CardHeader>
                         <CardContent>
                           <div className="flex justify-between items-center mb-2">
@@ -2519,16 +3365,53 @@ function NutritionPlan({ athleteData, userName }: NutritionPlanProps) {
                               <Badge variant="outline">F: {meal.fat}g</Badge>
                             </div>
                           </div>
-                          <div className="text-sm text-gray-600">
-                            <strong>Ingredients:</strong>
-                            <ul className="list-disc list-inside">
-                              {meal.ingredients.map((ing, ingIndex) => (
-                                <li key={ingIndex}>
-                                  {ing.name}: {ing.grams}g
-                                </li>
-                              ))}
-                            </ul>
-                          </div>
+  <div className="text-sm text-muted-foreground">
+  {/* Two columns: Original ingredients + AI alternatives */}
+  <div className="grid grid-cols-2 gap-4">
+    {/* Original Ingredients Column */}
+    <div>
+      <strong>Ingredienti:</strong>
+      <ul className="list-disc list-inside mt-1">
+        {meal.ingredients.map((ing: any, ingIndex: number) => (
+          <li key={ingIndex}>
+            {ing.name}: {ing.grams}g
+          </li>
+        ))}
+      </ul>
+    </div>
+    
+    {/* AI Alternatives Column - only show if there are alternatives */}
+    {meal.ingredients.some((ing: any) => 
+      aiSubstitutions.some(s => ing.name.toLowerCase().includes(s.original.toLowerCase()))
+    ) && (
+      <div className="border-l border-cyan-500/30 pl-4">
+        <div className="flex items-center gap-1 mb-1">
+          <Sparkles className="h-3 w-3 text-cyan-400" />
+          <strong className="text-cyan-400">Alternative AI:</strong>
+        </div>
+        <ul className="list-disc list-inside mt-1">
+          {meal.ingredients.map((ing: any, ingIndex: number) => {
+            const substitution = aiSubstitutions.find(s => 
+              ing.name.toLowerCase().includes(s.original.toLowerCase())
+            )
+            
+            if (substitution) {
+              return (
+                <li key={ingIndex} className="text-cyan-400">
+                  {substitution.substitute === "evitare" 
+                    ? <span className="text-red-400">Evitare {ing.name}</span>
+                    : `${substitution.substitute}: ${ing.grams}g`}
+                  <span className="text-xs text-muted-foreground ml-1">({substitution.reason})</span>
+                </li>
+              )
+            }
+            return null
+          }).filter(Boolean)}
+        </ul>
+      </div>
+    )}
+  </div>
+  </div>
                         </CardContent>
                       </Card>
                     ))
@@ -2573,6 +3456,304 @@ function NutritionPlan({ athleteData, userName }: NutritionPlanProps) {
                       </CardContent>
                     </Card>
                   )}
+                </TabsContent>
+
+  {/* Fueling Tab - Pre/Intra/Post Workout Supplements */}
+  <TabsContent value="fueling">
+  <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+  {/* Colonna Sinistra - Fueling Stack */}
+  <div className="lg:col-span-2 space-y-6">
+  
+  {/* EMPATHY Fueling Panel - Dynamic values based on selected workout - ONLY show for workout days */}
+  {selectedActivity && workoutMetrics.duration > 0 && (
+    <div className="p-4 rounded-lg bg-gradient-to-r from-orange-900/20 to-red-900/20 border border-orange-500/30">
+      <div className="flex items-center gap-2 mb-3">
+        <Sparkles className="h-5 w-5 text-orange-400" />
+        <span className="font-semibold text-orange-400">EMPATHY Fueling - Z{workoutMetrics.zone}</span>
+        <Badge variant="outline" className={`ml-auto
+          ${workoutMetrics.zone >= 5 ? 'border-red-500 text-red-400' :
+            workoutMetrics.zone >= 4 ? 'border-orange-500 text-orange-400' :
+            workoutMetrics.zone >= 3 ? 'border-yellow-500 text-yellow-400' :
+            'border-green-500 text-green-400'}
+        `}>
+          {workoutMetrics.zone >= 5 ? 'Alta Intensita' :
+           workoutMetrics.zone >= 4 ? 'Soglia' :
+           workoutMetrics.zone >= 3 ? 'Tempo' : 'Endurance'}
+        </Badge>
+      </div>
+      
+      <div className="grid grid-cols-3 gap-4 mb-3">
+        <div className="text-center p-3 bg-background/50 rounded">
+          <div className="text-xs text-muted-foreground">Pre-Workout</div>
+          <div className="text-xl font-bold text-orange-400">
+            {workoutMetrics.duration < 60 ? 0 : 
+             workoutMetrics.zone <= 2 ? 20 :
+             workoutMetrics.zone <= 3 ? 30 :
+             workoutMetrics.zone <= 4 ? 40 : 50}g
+          </div>
+          <div className="text-xs text-muted-foreground">CHO</div>
+        </div>
+        <div className="text-center p-3 bg-background/50 rounded">
+          <div className="text-xs text-muted-foreground">Intra-Workout</div>
+          <div className="text-xl font-bold text-yellow-400">
+            {workoutMetrics.duration < 60 ? 0 :
+             workoutMetrics.zone <= 2 ? 30 :
+             workoutMetrics.zone <= 3 ? 45 :
+             workoutMetrics.zone <= 4 ? 60 :
+             workoutMetrics.zone <= 5 ? 75 : 90}g/h
+          </div>
+          <div className="text-xs text-muted-foreground">CHO ({Math.round(workoutMetrics.duration / 60 * (
+            workoutMetrics.duration < 60 ? 0 :
+            workoutMetrics.zone <= 2 ? 30 :
+            workoutMetrics.zone <= 3 ? 45 :
+            workoutMetrics.zone <= 4 ? 60 :
+            workoutMetrics.zone <= 5 ? 75 : 90
+          ))}g tot)</div>
+        </div>
+        <div className="text-center p-3 bg-background/50 rounded">
+          <div className="text-xs text-muted-foreground">Post-Workout</div>
+          <div className="text-xl font-bold text-green-400">
+            {/* EMPATHY: Post-workout CHO = 0.8-1.2g/kg peso, non CHO bruciati */}
+            {workoutMetrics.zone >= 5 ? Math.round((athleteData?.weight_kg || 70) * 1.2) :
+             workoutMetrics.zone >= 4 ? Math.round((athleteData?.weight_kg || 70) * 1.0) :
+             workoutMetrics.zone >= 3 ? Math.round((athleteData?.weight_kg || 70) * 0.8) :
+             Math.round((athleteData?.weight_kg || 70) * 0.5)}g
+          </div>
+          <div className="text-xs text-muted-foreground">CHO + {Math.round((athleteData?.weight_kg || 70) * 0.3)}g PRO</div>
+        </div>
+      </div>
+      
+      <div className="flex flex-wrap gap-1">
+        <Badge variant="secondary" className="text-xs bg-orange-900/30">
+          Consumo: {workoutMetrics.kcal} kcal
+        </Badge>
+        <Badge variant="secondary" className="text-xs bg-orange-900/30">
+          CHO bruciati: {workoutMetrics.choBurned}g
+        </Badge>
+        <Badge variant="secondary" className="text-xs bg-orange-900/30">
+          Fat bruciati: {workoutMetrics.fatBurned}g
+        </Badge>
+        {workoutMetrics.duration > 90 && (
+          <Badge variant="secondary" className="text-xs bg-yellow-900/30">
+            Sessione lunga: aumenta CHO/h
+          </Badge>
+        )}
+      </div>
+    </div>
+  )}
+  
+  {/* Workout Info Header */}
+  {selectedActivity && (
+  <div className="flex items-center justify-between p-4 rounded-lg bg-gradient-to-r from-cyan-500/10 to-blue-500/10 border border-cyan-500/20">
+                        <div>
+                          <h3 className="font-medium text-foreground">
+                            {selectedActivity.title || selectedActivity.workout_name || "Allenamento"}
+                          </h3>
+                          <p className="text-sm text-muted-foreground">
+                            {selectedActivity.sport_type} - {workoutMetrics.duration} min - Zone {workoutMetrics.zone}
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-sm text-muted-foreground">Orario</p>
+                          <p className="font-medium text-cyan-400">
+                            {selectedActivity.scheduled_time || 
+                              (trainingPreferences?.preferred_training_time ? 
+                                `${parsePreferredTimeToHour(trainingPreferences.preferred_training_time)}:00` : 
+                                "Da definire")}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Pre-Workout Section */}
+                    <Card className="border-orange-500/30">
+                      <CardHeader className="pb-3">
+                        <CardTitle className="flex items-center gap-2 text-orange-400">
+                          <Clock className="h-5 w-5" />
+                          Pre-Workout (-45 min)
+                        </CardTitle>
+                        <p className="text-sm text-muted-foreground">
+                          Assumi 45 minuti prima dell'allenamento ({
+                            selectedActivity?.scheduled_time ? 
+                              (() => {
+                                const [h, m] = selectedActivity.scheduled_time.split(':').map(Number)
+                                const preH = m < 45 ? h - 1 : h
+                                const preM = m < 45 ? 60 + m - 45 : m - 45
+                                return `${String(preH).padStart(2, '0')}:${String(preM).padStart(2, '0')}`
+                              })() :
+                            trainingPreferences?.preferred_training_time ?
+                              `${parsePreferredTimeToHour(trainingPreferences.preferred_training_time) - 1}:15` :
+                              "calcola in base all'orario"
+                          })
+                        </p>
+                      </CardHeader>
+                      <CardContent>
+                        {preWorkoutStack.length > 0 ? (
+                          <div className="space-y-3">
+                            {preWorkoutStack.map((item, idx) => (
+                              <div key={idx} className="flex items-center justify-between p-3 rounded-lg bg-orange-500/5 border border-orange-500/20">
+                                <div className="flex items-center gap-3">
+                                  <Pill className="h-4 w-4 text-orange-400" />
+                                  <div>
+                                    <p className="font-medium">{item.name}</p>
+                                    <p className="text-sm text-muted-foreground">{item.note}</p>
+                                  </div>
+                                </div>
+                                <div className="text-right">
+                                  <Badge variant="outline" className="border-orange-500/50 text-orange-400">
+                                    {item.dose}
+                                  </Badge>
+                                  <p className="text-xs text-muted-foreground mt-1">{item.timing}</p>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-muted-foreground text-center py-4">
+                            Nessun integratore pre-workout consigliato per questo tipo di allenamento
+                          </p>
+                        )}
+                      </CardContent>
+                    </Card>
+
+                    {/* Intra-Workout Section */}
+                    <Card className="border-cyan-500/30">
+                      <CardHeader className="pb-3">
+                        <CardTitle className="flex items-center gap-2 text-cyan-400">
+                          <Flame className="h-5 w-5" />
+                          Intra-Workout Fueling
+                        </CardTitle>
+                        <div className="flex items-center justify-between">
+                          <p className="text-sm text-muted-foreground">
+                            Carboidrati totali: <span className="text-cyan-400 font-medium">{intraWorkCho}g</span>
+                          </p>
+                          <p className="text-sm text-muted-foreground">
+                            Durata: {workoutMetrics.duration} min
+                          </p>
+                        </div>
+                      </CardHeader>
+                      <CardContent>
+                        {intraWorkoutTiming.length > 0 ? (
+                          <div className="space-y-3">
+                            {intraWorkoutTiming.map((item, idx) => (
+                              <div key={idx} className="flex items-center justify-between p-3 rounded-lg bg-cyan-500/5 border border-cyan-500/20">
+                                <div className="flex items-center gap-3">
+                                  <Badge className="bg-cyan-600 text-white min-w-[60px] justify-center">
+                                    {item.time} min
+                                  </Badge>
+                                  <div>
+                                    <p className="font-medium">{item.product}</p>
+                                    <p className="text-sm text-muted-foreground">{item.brand}</p>
+                                  </div>
+                                </div>
+                                <div className="text-right">
+                                  <Badge variant="outline" className="border-cyan-500/50 text-cyan-400">
+                                    {item.cho}g CHO
+                                  </Badge>
+                                  <p className="text-xs text-muted-foreground mt-1">{item.details}</p>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        ) : workoutMetrics.duration < 60 ? (
+                          <p className="text-muted-foreground text-center py-4">
+                            Per allenamenti sotto i 60 minuti, l'acqua e' sufficiente
+                          </p>
+                        ) : (
+                          <p className="text-muted-foreground text-center py-4">
+                            Seleziona un allenamento per vedere il piano fueling
+                          </p>
+                        )}
+                      </CardContent>
+                    </Card>
+
+                    {/* Post-Workout Section */}
+                    <Card className="border-green-500/30">
+                      <CardHeader className="pb-3">
+                        <CardTitle className="flex items-center gap-2 text-green-400">
+                          <Package className="h-5 w-5" />
+                          Post-Workout Recovery
+                        </CardTitle>
+                        <p className="text-sm text-muted-foreground">
+                          Entro 30-60 minuti dalla fine dell'allenamento
+                        </p>
+                      </CardHeader>
+                      <CardContent>
+                        {postWorkoutStack.length > 0 ? (
+                          <div className="space-y-3">
+                            {postWorkoutStack.map((item, idx) => (
+                              <div key={idx} className="flex items-center justify-between p-3 rounded-lg bg-green-500/5 border border-green-500/20">
+                                <div className="flex items-center gap-3">
+                                  <Pill className="h-4 w-4 text-green-400" />
+                                  <div>
+                                    <p className="font-medium">{item.name}</p>
+                                    <p className="text-sm text-muted-foreground">{item.note}</p>
+                                  </div>
+                                </div>
+                                <div className="text-right">
+                                  <Badge variant="outline" className="border-green-500/50 text-green-400">
+                                    {item.dose}
+                                  </Badge>
+                                  <p className="text-xs text-muted-foreground mt-1">{item.timing}</p>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-muted-foreground text-center py-4">
+                            Nessun integratore post-workout consigliato
+                          </p>
+                        )}
+
+                        {/* Recovery vs Whey recommendation based on workout type */}
+                        <div className="mt-4 p-3 rounded-lg bg-secondary/50">
+                          <p className="text-sm font-medium mb-2">Raccomandazione Recovery:</p>
+                          <p className="text-sm text-muted-foreground">
+                            {workoutMetrics.zone >= 4 || workoutMetrics.duration > 90 ? (
+                              <>
+                                <span className="text-green-400 font-medium">Recovery Drink</span> - 
+                                Allenamento intenso ({workoutMetrics.zone >= 4 ? `Zone ${workoutMetrics.zone}` : `${workoutMetrics.duration}min`}). 
+                                Rapporto CHO:PRO 3:1 per ripristino glicogeno e sintesi proteica.
+                              </>
+                            ) : workoutMetrics.zone <= 2 && workoutMetrics.duration < 60 ? (
+                              <>
+                                <span className="text-cyan-400 font-medium">Solo idratazione</span> - 
+                                Allenamento leggero. Pasto normale sufficiente per il recupero.
+                              </>
+                            ) : (
+                              <>
+                                <span className="text-blue-400 font-medium">Whey Protein</span> - 
+                                Allenamento moderato. 20-30g proteine per supportare il recupero muscolare.
+                              </>
+                            )}
+                          </p>
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    {/* Preferred Brands */}
+                    {sportSupplements.brands.length > 0 && (
+                      <div className="p-4 rounded-lg bg-secondary/30 border border-border">
+                        <p className="text-sm text-muted-foreground mb-2">Marchi preferiti configurati:</p>
+                        <div className="flex flex-wrap gap-2">
+                          {sportSupplements.brands.map((brand) => (
+                            <Badge key={brand} variant="outline" className="border-purple-500/50 text-purple-400">
+                              {brand}
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  
+                  {/* Colonna Destra - Report Nutrigenomics */}
+                  <div className="lg:col-span-1">
+                    <NutrigenomicsPanel 
+                      athleteId={athleteData?.id}
+                      compact={true}
+                    />
+                  </div>
+                </div>
                 </TabsContent>
               </Tabs>
             </CardContent>
