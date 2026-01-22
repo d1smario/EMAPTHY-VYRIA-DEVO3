@@ -141,6 +141,55 @@ export const BRANDS_DATABASE: Record<string, BrandInfo> = {
     website: 'https://www.226ers.com',
     specialization: ['endurance', 'triathlon', 'ultra']
   },
+  precision: {
+    id: 'precision',
+    name: 'Precision Fuel & Hydration',
+    country: 'UK',
+    website: 'https://www.precisionhydration.com',
+    specialization: ['hydration', 'electrolytes', 'sweat testing', 'personalized']
+  },
+  high5: {
+    id: 'high5',
+    name: 'HIGH5',
+    country: 'UK',
+    website: 'https://www.highfive.co.uk',
+    specialization: ['endurance', 'running', 'cycling', 'affordable']
+  },
+  nduranz: {
+    id: 'nduranz',
+    name: 'Nduranz',
+    country: 'Slovenia',
+    website: 'https://www.nduranz.com',
+    specialization: ['endurance', 'natural', 'science-based']
+  },
+  torq: {
+    id: 'torq',
+    name: 'TORQ',
+    country: 'UK',
+    website: 'https://www.torqfitness.co.uk',
+    specialization: ['cycling', 'triathlon', 'organic', 'natural']
+  },
+  hammer: {
+    id: 'hammer',
+    name: 'Hammer Nutrition',
+    country: 'USA',
+    website: 'https://www.hammernutrition.com',
+    specialization: ['ultra', 'endurance', 'no sugar', 'veteran']
+  },
+  tailwind: {
+    id: 'tailwind',
+    name: 'Tailwind Nutrition',
+    country: 'USA',
+    website: 'https://www.tailwindnutrition.com',
+    specialization: ['ultra', 'running', 'all-in-one', 'simplicity']
+  },
+  skratch: {
+    id: 'skratch',
+    name: 'Skratch Labs',
+    country: 'USA',
+    website: 'https://www.skratchlabs.com',
+    specialization: ['hydration', 'natural', 'pro-cycling', 'real food']
+  },
   namedsport: {
     id: 'namedsport',
     name: 'NamedSport',
@@ -1428,6 +1477,969 @@ export const SUPPLEMENTS_DATABASE: SupplementProduct[] = [
       absorption_speed: 'fast'
     },
     tags: ['carboidrati', 'elettroliti', 'endurance', 'isotonic']
+  },
+
+  // =====================================================
+  // NUOVI PRODOTTI - PRECISION FUEL & HYDRATION
+  // =====================================================
+  {
+    id: 'pf-pfh30',
+    brand: 'precision',
+    name: 'PF 30 Gel',
+    type: 'intra_workout',
+    category: 'Gel',
+    format: 'gel 51g',
+    serving_size_g: 51,
+    servings_per_package: 1,
+    nutrition: {
+      kcal: 120,
+      cho_g: 30,
+      sugars_g: 15,
+      pro_g: 0,
+      fat_g: 0,
+      fiber_g: 0,
+      sodium_mg: 0,
+      potassium_mg: 0,
+      magnesium_mg: 0,
+      caffeine_mg: 0
+    },
+    features: {
+      is_isotonic: false,
+      is_hypotonic: false,
+      has_electrolytes: false,
+      has_bcaa: false,
+      has_caffeine: false,
+      is_vegan: true,
+      is_gluten_free: true,
+      is_lactose_free: true,
+      maltodextrin_ratio: 0.5,
+      fructose_ratio: 0.5
+    },
+    timing: {
+      during_activity: true,
+      absorption_speed: 'fast'
+    },
+    tags: ['gel', 'energia', '1:1 ratio', 'mild']
+  },
+  {
+    id: 'pf-pfh90',
+    brand: 'precision',
+    name: 'PF 90 Gel',
+    type: 'intra_workout',
+    category: 'Gel',
+    format: 'gel 106g',
+    serving_size_g: 106,
+    servings_per_package: 1,
+    nutrition: {
+      kcal: 360,
+      cho_g: 90,
+      sugars_g: 45,
+      pro_g: 0,
+      fat_g: 0,
+      fiber_g: 0,
+      sodium_mg: 0,
+      potassium_mg: 0,
+      magnesium_mg: 0,
+      caffeine_mg: 0
+    },
+    features: {
+      is_isotonic: false,
+      is_hypotonic: false,
+      has_electrolytes: false,
+      has_bcaa: false,
+      has_caffeine: false,
+      is_vegan: true,
+      is_gluten_free: true,
+      is_lactose_free: true,
+      maltodextrin_ratio: 0.5,
+      fructose_ratio: 0.5
+    },
+    timing: {
+      during_activity: true,
+      absorption_speed: 'fast'
+    },
+    tags: ['gel', 'energia', 'alto-cho', 'race']
+  },
+  {
+    id: 'pf-sweat-1000',
+    brand: 'precision',
+    name: 'PH 1000 Electrolyte Drink',
+    type: 'intra_workout',
+    category: 'Compresse',
+    format: 'tubo 12 compresse',
+    serving_size_g: 4.5,
+    servings_per_package: 12,
+    nutrition: {
+      kcal: 8,
+      cho_g: 1.5,
+      sugars_g: 0,
+      pro_g: 0,
+      fat_g: 0,
+      fiber_g: 0,
+      sodium_mg: 1000,
+      potassium_mg: 0,
+      magnesium_mg: 0,
+      caffeine_mg: 0
+    },
+    features: {
+      is_isotonic: false,
+      is_hypotonic: true,
+      has_electrolytes: true,
+      has_bcaa: false,
+      has_caffeine: false,
+      is_vegan: true,
+      is_gluten_free: true,
+      is_lactose_free: true
+    },
+    timing: {
+      during_activity: true,
+      absorption_speed: 'fast'
+    },
+    tags: ['elettroliti', 'sodio', 'idratazione', 'sudorazione intensa']
+  },
+  {
+    id: 'pf-sweat-1500',
+    brand: 'precision',
+    name: 'PH 1500 Electrolyte Drink',
+    type: 'intra_workout',
+    category: 'Compresse',
+    format: 'tubo 12 compresse',
+    serving_size_g: 4.5,
+    servings_per_package: 12,
+    nutrition: {
+      kcal: 8,
+      cho_g: 1.5,
+      sugars_g: 0,
+      pro_g: 0,
+      fat_g: 0,
+      fiber_g: 0,
+      sodium_mg: 1500,
+      potassium_mg: 0,
+      magnesium_mg: 0,
+      caffeine_mg: 0
+    },
+    features: {
+      is_isotonic: false,
+      is_hypotonic: true,
+      has_electrolytes: true,
+      has_bcaa: false,
+      has_caffeine: false,
+      is_vegan: true,
+      is_gluten_free: true,
+      is_lactose_free: true
+    },
+    timing: {
+      during_activity: true,
+      absorption_speed: 'fast'
+    },
+    tags: ['elettroliti', 'alto-sodio', 'idratazione', 'sudorazione estrema']
+  },
+
+  // =====================================================
+  // HIGH5
+  // =====================================================
+  {
+    id: 'high5-energy-gel',
+    brand: 'high5',
+    name: 'Energy Gel',
+    type: 'intra_workout',
+    category: 'Gel',
+    format: 'gel 40g',
+    serving_size_g: 40,
+    servings_per_package: 1,
+    nutrition: {
+      kcal: 92,
+      cho_g: 23,
+      sugars_g: 12,
+      pro_g: 0,
+      fat_g: 0,
+      fiber_g: 0,
+      sodium_mg: 35,
+      potassium_mg: 0,
+      magnesium_mg: 0,
+      caffeine_mg: 0
+    },
+    features: {
+      is_isotonic: false,
+      is_hypotonic: false,
+      has_electrolytes: true,
+      has_bcaa: false,
+      has_caffeine: false,
+      is_vegan: true,
+      is_gluten_free: true,
+      is_lactose_free: true
+    },
+    timing: {
+      during_activity: true,
+      absorption_speed: 'fast'
+    },
+    tags: ['gel', 'energia', 'economico']
+  },
+  {
+    id: 'high5-energy-gel-aqua',
+    brand: 'high5',
+    name: 'Energy Gel Aqua',
+    type: 'intra_workout',
+    category: 'Gel',
+    format: 'gel 66g',
+    serving_size_g: 66,
+    servings_per_package: 1,
+    nutrition: {
+      kcal: 92,
+      cho_g: 23,
+      sugars_g: 12,
+      pro_g: 0,
+      fat_g: 0,
+      fiber_g: 0,
+      sodium_mg: 35,
+      potassium_mg: 0,
+      magnesium_mg: 0,
+      caffeine_mg: 0
+    },
+    features: {
+      is_isotonic: true,
+      is_hypotonic: false,
+      has_electrolytes: true,
+      has_bcaa: false,
+      has_caffeine: false,
+      is_vegan: true,
+      is_gluten_free: true,
+      is_lactose_free: true
+    },
+    timing: {
+      during_activity: true,
+      absorption_speed: 'fast'
+    },
+    tags: ['gel', 'isotonico', 'no acqua', 'facile digestione']
+  },
+  {
+    id: 'high5-energy-bar',
+    brand: 'high5',
+    name: 'Energy Bar',
+    type: 'intra_workout',
+    category: 'Barretta',
+    format: 'barretta 55g',
+    serving_size_g: 55,
+    servings_per_package: 1,
+    nutrition: {
+      kcal: 200,
+      cho_g: 40,
+      sugars_g: 20,
+      pro_g: 3,
+      fat_g: 3,
+      fiber_g: 2,
+      sodium_mg: 60,
+      potassium_mg: 0,
+      magnesium_mg: 0,
+      caffeine_mg: 0
+    },
+    features: {
+      is_isotonic: false,
+      is_hypotonic: false,
+      has_electrolytes: true,
+      has_bcaa: false,
+      has_caffeine: false,
+      is_vegan: true,
+      is_gluten_free: false,
+      is_lactose_free: true
+    },
+    timing: {
+      during_activity: true,
+      absorption_speed: 'medium'
+    },
+    tags: ['barretta', 'energia', 'solido', 'avena']
+  },
+  {
+    id: 'high5-zero',
+    brand: 'high5',
+    name: 'Zero Electrolyte',
+    type: 'intra_workout',
+    category: 'Compresse',
+    format: 'tubo 20 compresse',
+    serving_size_g: 3.8,
+    servings_per_package: 20,
+    nutrition: {
+      kcal: 7,
+      cho_g: 1,
+      sugars_g: 0,
+      pro_g: 0,
+      fat_g: 0,
+      fiber_g: 0,
+      sodium_mg: 250,
+      potassium_mg: 65,
+      magnesium_mg: 10,
+      caffeine_mg: 0
+    },
+    features: {
+      is_isotonic: false,
+      is_hypotonic: true,
+      has_electrolytes: true,
+      has_bcaa: false,
+      has_caffeine: false,
+      is_vegan: true,
+      is_gluten_free: true,
+      is_lactose_free: true
+    },
+    timing: {
+      during_activity: true,
+      absorption_speed: 'fast'
+    },
+    tags: ['elettroliti', 'zero calorie', 'idratazione']
+  },
+  {
+    id: 'high5-4-1',
+    brand: 'high5',
+    name: 'Recovery Drink 4:1',
+    type: 'post_workout',
+    category: 'Polvere',
+    format: 'bustina 60g',
+    serving_size_g: 60,
+    servings_per_package: 1,
+    nutrition: {
+      kcal: 224,
+      cho_g: 44,
+      sugars_g: 12,
+      pro_g: 15,
+      fat_g: 0,
+      fiber_g: 0,
+      sodium_mg: 200,
+      potassium_mg: 300,
+      magnesium_mg: 50,
+      caffeine_mg: 0
+    },
+    features: {
+      is_isotonic: false,
+      is_hypotonic: false,
+      has_electrolytes: true,
+      has_bcaa: true,
+      has_caffeine: false,
+      is_vegan: false,
+      is_gluten_free: true,
+      is_lactose_free: false
+    },
+    timing: {
+      minutes_after: 30,
+      absorption_speed: 'medium'
+    },
+    tags: ['recovery', '4:1 ratio', 'proteine', 'carboidrati']
+  },
+
+  // =====================================================
+  // NDURANZ
+  // =====================================================
+  {
+    id: 'nduranz-nrgy-gel',
+    brand: 'nduranz',
+    name: 'Nrgy Unit Gel',
+    type: 'intra_workout',
+    category: 'Gel',
+    format: 'gel 25g',
+    serving_size_g: 25,
+    servings_per_package: 1,
+    nutrition: {
+      kcal: 90,
+      cho_g: 22.5,
+      sugars_g: 11,
+      pro_g: 0,
+      fat_g: 0,
+      fiber_g: 0,
+      sodium_mg: 100,
+      potassium_mg: 50,
+      magnesium_mg: 15,
+      caffeine_mg: 0
+    },
+    features: {
+      is_isotonic: false,
+      is_hypotonic: false,
+      has_electrolytes: true,
+      has_bcaa: false,
+      has_caffeine: false,
+      is_vegan: true,
+      is_gluten_free: true,
+      is_lactose_free: true,
+      maltodextrin_ratio: 0.8,
+      fructose_ratio: 0.2
+    },
+    timing: {
+      during_activity: true,
+      absorption_speed: 'fast'
+    },
+    tags: ['gel', 'energia', 'sloveno', 'natural']
+  },
+  {
+    id: 'nduranz-nrgy-bar',
+    brand: 'nduranz',
+    name: 'Nrgy Unit Bar',
+    type: 'intra_workout',
+    category: 'Barretta',
+    format: 'barretta 45g',
+    serving_size_g: 45,
+    servings_per_package: 1,
+    nutrition: {
+      kcal: 180,
+      cho_g: 36,
+      sugars_g: 18,
+      pro_g: 2,
+      fat_g: 3,
+      fiber_g: 1,
+      sodium_mg: 80,
+      potassium_mg: 40,
+      magnesium_mg: 10,
+      caffeine_mg: 0
+    },
+    features: {
+      is_isotonic: false,
+      is_hypotonic: false,
+      has_electrolytes: true,
+      has_bcaa: false,
+      has_caffeine: false,
+      is_vegan: true,
+      is_gluten_free: true,
+      is_lactose_free: true
+    },
+    timing: {
+      during_activity: true,
+      absorption_speed: 'medium'
+    },
+    tags: ['barretta', 'energia', 'datteri', 'naturale']
+  },
+  {
+    id: 'nduranz-nrgy-drink',
+    brand: 'nduranz',
+    name: 'Nrgy Unit Drink 90',
+    type: 'intra_workout',
+    category: 'Polvere',
+    format: 'bustina 45g',
+    serving_size_g: 45,
+    servings_per_package: 1,
+    nutrition: {
+      kcal: 360,
+      cho_g: 90,
+      sugars_g: 45,
+      pro_g: 0,
+      fat_g: 0,
+      fiber_g: 0,
+      sodium_mg: 400,
+      potassium_mg: 100,
+      magnesium_mg: 30,
+      caffeine_mg: 0
+    },
+    features: {
+      is_isotonic: true,
+      is_hypotonic: false,
+      has_electrolytes: true,
+      has_bcaa: false,
+      has_caffeine: false,
+      is_vegan: true,
+      is_gluten_free: true,
+      is_lactose_free: true,
+      maltodextrin_ratio: 0.5,
+      fructose_ratio: 0.5
+    },
+    timing: {
+      during_activity: true,
+      absorption_speed: 'fast'
+    },
+    tags: ['drink', '90g/h', 'alto-cho', 'race']
+  },
+
+  // =====================================================
+  // TORQ
+  // =====================================================
+  {
+    id: 'torq-gel',
+    brand: 'torq',
+    name: 'Energy Gel',
+    type: 'intra_workout',
+    category: 'Gel',
+    format: 'gel 45g',
+    serving_size_g: 45,
+    servings_per_package: 1,
+    nutrition: {
+      kcal: 114,
+      cho_g: 28.5,
+      sugars_g: 14,
+      pro_g: 0,
+      fat_g: 0,
+      fiber_g: 0,
+      sodium_mg: 70,
+      potassium_mg: 35,
+      magnesium_mg: 10,
+      caffeine_mg: 0
+    },
+    features: {
+      is_isotonic: false,
+      is_hypotonic: false,
+      has_electrolytes: true,
+      has_bcaa: false,
+      has_caffeine: false,
+      is_vegan: true,
+      is_gluten_free: true,
+      is_lactose_free: true,
+      maltodextrin_ratio: 0.67,
+      fructose_ratio: 0.33
+    },
+    timing: {
+      during_activity: true,
+      absorption_speed: 'fast'
+    },
+    tags: ['gel', 'energia', '2:1 maltodex:fructose']
+  },
+  {
+    id: 'torq-bar',
+    brand: 'torq',
+    name: 'Energy Bar',
+    type: 'intra_workout',
+    category: 'Barretta',
+    format: 'barretta 45g',
+    serving_size_g: 45,
+    servings_per_package: 1,
+    nutrition: {
+      kcal: 182,
+      cho_g: 32,
+      sugars_g: 16,
+      pro_g: 4,
+      fat_g: 4,
+      fiber_g: 2,
+      sodium_mg: 90,
+      potassium_mg: 50,
+      magnesium_mg: 15,
+      caffeine_mg: 0
+    },
+    features: {
+      is_isotonic: false,
+      is_hypotonic: false,
+      has_electrolytes: true,
+      has_bcaa: false,
+      has_caffeine: false,
+      is_vegan: true,
+      is_gluten_free: false,
+      is_lactose_free: true
+    },
+    timing: {
+      during_activity: true,
+      absorption_speed: 'medium'
+    },
+    tags: ['barretta', 'energia', 'biologico']
+  },
+  {
+    id: 'torq-recovery',
+    brand: 'torq',
+    name: 'Recovery Drink',
+    type: 'post_workout',
+    category: 'Polvere',
+    format: 'bustina 65g',
+    serving_size_g: 65,
+    servings_per_package: 1,
+    nutrition: {
+      kcal: 246,
+      cho_g: 40,
+      sugars_g: 20,
+      pro_g: 20,
+      fat_g: 0,
+      fiber_g: 0,
+      sodium_mg: 150,
+      potassium_mg: 200,
+      magnesium_mg: 40,
+      caffeine_mg: 0
+    },
+    features: {
+      is_isotonic: false,
+      is_hypotonic: false,
+      has_electrolytes: true,
+      has_bcaa: true,
+      has_caffeine: false,
+      is_vegan: false,
+      is_gluten_free: true,
+      is_lactose_free: false
+    },
+    timing: {
+      minutes_after: 30,
+      absorption_speed: 'medium'
+    },
+    tags: ['recovery', 'proteine', 'whey', '2:1 ratio']
+  },
+
+  // =====================================================
+  // HAMMER NUTRITION
+  // =====================================================
+  {
+    id: 'hammer-gel',
+    brand: 'hammer',
+    name: 'Hammer Gel',
+    type: 'intra_workout',
+    category: 'Gel',
+    format: 'gel 33g',
+    serving_size_g: 33,
+    servings_per_package: 1,
+    nutrition: {
+      kcal: 90,
+      cho_g: 21,
+      sugars_g: 2,
+      pro_g: 0,
+      fat_g: 0,
+      fiber_g: 0,
+      sodium_mg: 25,
+      potassium_mg: 30,
+      magnesium_mg: 0,
+      caffeine_mg: 0
+    },
+    features: {
+      is_isotonic: false,
+      is_hypotonic: false,
+      has_electrolytes: true,
+      has_bcaa: false,
+      has_caffeine: false,
+      is_vegan: true,
+      is_gluten_free: true,
+      is_lactose_free: true
+    },
+    timing: {
+      during_activity: true,
+      absorption_speed: 'fast'
+    },
+    tags: ['gel', 'energia', 'basso zucchero', 'maltodestrine']
+  },
+  {
+    id: 'hammer-perpetuem',
+    brand: 'hammer',
+    name: 'Perpetuem',
+    type: 'intra_workout',
+    category: 'Polvere',
+    format: 'barattolo 1.36kg',
+    serving_size_g: 68,
+    servings_per_package: 20,
+    nutrition: {
+      kcal: 270,
+      cho_g: 54,
+      sugars_g: 4,
+      pro_g: 7,
+      fat_g: 3,
+      fiber_g: 0,
+      sodium_mg: 130,
+      potassium_mg: 200,
+      magnesium_mg: 30,
+      caffeine_mg: 0
+    },
+    features: {
+      is_isotonic: true,
+      is_hypotonic: false,
+      has_electrolytes: true,
+      has_bcaa: false,
+      has_caffeine: false,
+      is_vegan: false,
+      is_gluten_free: true,
+      is_lactose_free: true
+    },
+    timing: {
+      during_activity: true,
+      absorption_speed: 'slow'
+    },
+    tags: ['ultra', 'endurance', 'proteine', 'grassi', 'lunga durata']
+  },
+  {
+    id: 'hammer-heed',
+    brand: 'hammer',
+    name: 'HEED',
+    type: 'intra_workout',
+    category: 'Polvere',
+    format: 'barattolo 928g',
+    serving_size_g: 29,
+    servings_per_package: 32,
+    nutrition: {
+      kcal: 100,
+      cho_g: 25,
+      sugars_g: 0,
+      pro_g: 0,
+      fat_g: 0,
+      fiber_g: 0,
+      sodium_mg: 40,
+      potassium_mg: 40,
+      magnesium_mg: 6,
+      caffeine_mg: 0
+    },
+    features: {
+      is_isotonic: true,
+      is_hypotonic: false,
+      has_electrolytes: true,
+      has_bcaa: false,
+      has_caffeine: false,
+      is_vegan: true,
+      is_gluten_free: true,
+      is_lactose_free: true
+    },
+    timing: {
+      during_activity: true,
+      absorption_speed: 'fast'
+    },
+    tags: ['drink', 'energia', 'no zucchero', 'stevia']
+  },
+  {
+    id: 'hammer-recoverite',
+    brand: 'hammer',
+    name: 'Recoverite',
+    type: 'post_workout',
+    category: 'Polvere',
+    format: 'barattolo 907g',
+    serving_size_g: 57,
+    servings_per_package: 16,
+    nutrition: {
+      kcal: 170,
+      cho_g: 32,
+      sugars_g: 10,
+      pro_g: 10,
+      fat_g: 1,
+      fiber_g: 0,
+      sodium_mg: 90,
+      potassium_mg: 90,
+      magnesium_mg: 50,
+      caffeine_mg: 0
+    },
+    features: {
+      is_isotonic: false,
+      is_hypotonic: false,
+      has_electrolytes: true,
+      has_bcaa: true,
+      has_caffeine: false,
+      is_vegan: false,
+      is_gluten_free: true,
+      is_lactose_free: true
+    },
+    timing: {
+      minutes_after: 30,
+      absorption_speed: 'medium'
+    },
+    tags: ['recovery', 'proteine', 'whey isolate', 'glutammina']
+  },
+
+  // =====================================================
+  // TAILWIND
+  // =====================================================
+  {
+    id: 'tailwind-endurance',
+    brand: 'tailwind',
+    name: 'Endurance Fuel',
+    type: 'intra_workout',
+    category: 'Polvere',
+    format: 'bustina 54g',
+    serving_size_g: 54,
+    servings_per_package: 1,
+    nutrition: {
+      kcal: 200,
+      cho_g: 50,
+      sugars_g: 50,
+      pro_g: 0,
+      fat_g: 0,
+      fiber_g: 0,
+      sodium_mg: 310,
+      potassium_mg: 88,
+      magnesium_mg: 14,
+      caffeine_mg: 0
+    },
+    features: {
+      is_isotonic: true,
+      is_hypotonic: false,
+      has_electrolytes: true,
+      has_bcaa: false,
+      has_caffeine: false,
+      is_vegan: true,
+      is_gluten_free: true,
+      is_lactose_free: true
+    },
+    timing: {
+      during_activity: true,
+      absorption_speed: 'fast'
+    },
+    tags: ['drink', 'all-in-one', 'destrosio', 'saccarosio']
+  },
+  {
+    id: 'tailwind-caffeinated',
+    brand: 'tailwind',
+    name: 'Endurance Fuel Caffeinated',
+    type: 'intra_workout',
+    category: 'Polvere',
+    format: 'bustina 54g',
+    serving_size_g: 54,
+    servings_per_package: 1,
+    nutrition: {
+      kcal: 200,
+      cho_g: 50,
+      sugars_g: 50,
+      pro_g: 0,
+      fat_g: 0,
+      fiber_g: 0,
+      sodium_mg: 310,
+      potassium_mg: 88,
+      magnesium_mg: 14,
+      caffeine_mg: 35
+    },
+    features: {
+      is_isotonic: true,
+      is_hypotonic: false,
+      has_electrolytes: true,
+      has_bcaa: false,
+      has_caffeine: true,
+      is_vegan: true,
+      is_gluten_free: true,
+      is_lactose_free: true
+    },
+    timing: {
+      during_activity: true,
+      absorption_speed: 'fast'
+    },
+    tags: ['drink', 'caffeina', 'all-in-one', 'ultra']
+  },
+  {
+    id: 'tailwind-recovery',
+    brand: 'tailwind',
+    name: 'Rebuild Recovery',
+    type: 'post_workout',
+    category: 'Polvere',
+    format: 'bustina 62g',
+    serving_size_g: 62,
+    servings_per_package: 1,
+    nutrition: {
+      kcal: 210,
+      cho_g: 36,
+      sugars_g: 26,
+      pro_g: 10,
+      fat_g: 3,
+      fiber_g: 0,
+      sodium_mg: 180,
+      potassium_mg: 320,
+      magnesium_mg: 30,
+      caffeine_mg: 0
+    },
+    features: {
+      is_isotonic: false,
+      is_hypotonic: false,
+      has_electrolytes: true,
+      has_bcaa: true,
+      has_caffeine: false,
+      is_vegan: false,
+      is_gluten_free: true,
+      is_lactose_free: true
+    },
+    timing: {
+      minutes_after: 30,
+      absorption_speed: 'medium'
+    },
+    tags: ['recovery', 'proteine', 'rice protein', 'completo']
+  },
+
+  // =====================================================
+  // SKRATCH LABS
+  // =====================================================
+  {
+    id: 'skratch-hydration',
+    brand: 'skratch',
+    name: 'Sport Hydration Drink Mix',
+    type: 'intra_workout',
+    category: 'Polvere',
+    format: 'bustina 22g',
+    serving_size_g: 22,
+    servings_per_package: 1,
+    nutrition: {
+      kcal: 80,
+      cho_g: 20,
+      sugars_g: 18,
+      pro_g: 0,
+      fat_g: 0,
+      fiber_g: 0,
+      sodium_mg: 380,
+      potassium_mg: 38,
+      magnesium_mg: 38,
+      caffeine_mg: 0
+    },
+    features: {
+      is_isotonic: true,
+      is_hypotonic: false,
+      has_electrolytes: true,
+      has_bcaa: false,
+      has_caffeine: false,
+      is_vegan: true,
+      is_gluten_free: true,
+      is_lactose_free: true
+    },
+    timing: {
+      during_activity: true,
+      absorption_speed: 'fast'
+    },
+    tags: ['drink', 'elettroliti', 'naturale', 'real fruit']
+  },
+  {
+    id: 'skratch-superfuel',
+    brand: 'skratch',
+    name: 'Superfuel',
+    type: 'intra_workout',
+    category: 'Polvere',
+    format: 'bustina 60g',
+    serving_size_g: 60,
+    servings_per_package: 1,
+    nutrition: {
+      kcal: 400,
+      cho_g: 100,
+      sugars_g: 0,
+      pro_g: 0,
+      fat_g: 0,
+      fiber_g: 0,
+      sodium_mg: 800,
+      potassium_mg: 80,
+      magnesium_mg: 80,
+      caffeine_mg: 0
+    },
+    features: {
+      is_isotonic: false,
+      is_hypotonic: false,
+      has_electrolytes: true,
+      has_bcaa: false,
+      has_caffeine: false,
+      is_vegan: true,
+      is_gluten_free: true,
+      is_lactose_free: true
+    },
+    timing: {
+      during_activity: true,
+      absorption_speed: 'fast'
+    },
+    tags: ['drink', 'alto-cho', 'cluster dextrin', 'race day']
+  },
+  {
+    id: 'skratch-chews',
+    brand: 'skratch',
+    name: 'Sport Energy Chews',
+    type: 'intra_workout',
+    category: 'Gommose',
+    format: 'pacchetto 50g',
+    serving_size_g: 50,
+    servings_per_package: 1,
+    nutrition: {
+      kcal: 160,
+      cho_g: 40,
+      sugars_g: 32,
+      pro_g: 0,
+      fat_g: 0,
+      fiber_g: 0,
+      sodium_mg: 80,
+      potassium_mg: 40,
+      magnesium_mg: 0,
+      caffeine_mg: 0
+    },
+    features: {
+      is_isotonic: false,
+      is_hypotonic: false,
+      has_electrolytes: true,
+      has_bcaa: false,
+      has_caffeine: false,
+      is_vegan: false,
+      is_gluten_free: true,
+      is_lactose_free: true
+    },
+    timing: {
+      during_activity: true,
+      absorption_speed: 'medium'
+    },
+    tags: ['chews', 'gommose', 'energia', 'pectina']
   }
 ]
 
