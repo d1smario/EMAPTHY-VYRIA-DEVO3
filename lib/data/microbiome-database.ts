@@ -203,6 +203,524 @@ export const BACTERIA_DATABASE: BacteriaProfile[] = [
     optimal_range: { min: 1, max: 5 },
     promoting_foods: ['mirtilli', 'uva', 'melograno', 'tè verde', 'olio di pesce', 'polifenoli', 'digiuno intermittente'],
     inhibiting_foods: ['dieta povera di polifenoli', 'eccesso calorie']
+  },
+
+  // ==================== NUOVI BATTERI AGGIUNTI ====================
+  
+  // FIRMICUTES - Espansione
+  {
+    id: 'eubacterium_rectale',
+    name: 'Eubacterium rectale',
+    phylum: 'Firmicutes',
+    genus: 'Eubacterium',
+    species: 'rectale',
+    functions: ['produzione butirrato', 'fermentazione amido', 'cross-feeding con bifidobatteri'],
+    preferred_substrates: ['amido resistente', 'oligosaccaridi', 'acetato'],
+    metabolites_produced: ['butirrato', 'lattato'],
+    health_effects: {
+      positive: ['protezione colon', 'anti-infiammatorio', 'regolazione glicemia'],
+      negative: []
+    },
+    optimal_range: { min: 2, max: 12 },
+    promoting_foods: ['cereali integrali', 'legumi', 'banana verde', 'patate fredde'],
+    inhibiting_foods: ['dieta low-carb', 'antibiotici']
+  },
+  {
+    id: 'coprococcus',
+    name: 'Coprococcus',
+    phylum: 'Firmicutes',
+    genus: 'Coprococcus',
+    functions: ['produzione butirrato', 'fermentazione fibre', 'associato a benessere mentale'],
+    preferred_substrates: ['fibre fermentabili', 'FOS', 'inulina'],
+    metabolites_produced: ['butirrato', 'propionato'],
+    health_effects: {
+      positive: ['salute mentale', 'produzione GABA', 'riduzione depressione'],
+      negative: []
+    },
+    optimal_range: { min: 1, max: 8 },
+    promoting_foods: ['avena', 'orzo', 'segale', 'cipolla', 'aglio'],
+    inhibiting_foods: ['stress cronico', 'carenza fibre']
+  },
+  {
+    id: 'blautia',
+    name: 'Blautia',
+    phylum: 'Firmicutes',
+    genus: 'Blautia',
+    functions: ['metabolismo acidi biliari', 'produzione SCFA', 'immunomodulazione'],
+    preferred_substrates: ['carboidrati complessi', 'fibre', 'muco'],
+    metabolites_produced: ['acetato', 'propionato', 'etanolo'],
+    health_effects: {
+      positive: ['regolazione peso', 'metabolismo lipidico', 'riduzione infiammazione viscerale'],
+      negative: []
+    },
+    optimal_range: { min: 3, max: 15 },
+    promoting_foods: ['cereali integrali', 'verdure a foglia', 'legumi'],
+    inhibiting_foods: ['dieta occidentale', 'grassi saturi']
+  },
+  {
+    id: 'ruminococcus_bromii',
+    name: 'Ruminococcus bromii',
+    phylum: 'Firmicutes',
+    genus: 'Ruminococcus',
+    species: 'bromii',
+    functions: ['degradazione amido resistente primaria', 'keystone species'],
+    preferred_substrates: ['amido resistente tipo 2 e 3', 'granuli amido'],
+    metabolites_produced: ['acetato', 'formiato', 'H2', 'CO2'],
+    health_effects: {
+      positive: ['digestione amido', 'supporto altri batteri (cross-feeding)', 'energia da fibre'],
+      negative: []
+    },
+    optimal_range: { min: 1, max: 10 },
+    promoting_foods: ['patate fredde', 'riso freddo', 'banana verde', 'legumi'],
+    inhibiting_foods: ['cottura prolungata (distrugge amido resistente)']
+  },
+  {
+    id: 'streptococcus_thermophilus',
+    name: 'Streptococcus thermophilus',
+    phylum: 'Firmicutes',
+    genus: 'Streptococcus',
+    species: 'thermophilus',
+    functions: ['fermentazione lattica', 'produzione enzimi', 'starter yogurt'],
+    preferred_substrates: ['lattosio', 'glucosio', 'saccarosio'],
+    metabolites_produced: ['acido lattico', 'folato', 'EPS'],
+    health_effects: {
+      positive: ['digestione lattosio', 'immunità', 'assorbimento minerali'],
+      negative: []
+    },
+    optimal_range: { min: 0.5, max: 5 },
+    promoting_foods: ['yogurt', 'formaggi stagionati', 'latte fermentato'],
+    inhibiting_foods: ['antibiotici', 'pH troppo acido']
+  },
+  {
+    id: 'enterococcus',
+    name: 'Enterococcus faecium',
+    phylum: 'Firmicutes',
+    genus: 'Enterococcus',
+    species: 'faecium',
+    functions: ['produzione batteriocine', 'competizione patogeni', 'metabolismo aminoacidi'],
+    preferred_substrates: ['carboidrati semplici', 'aminoacidi'],
+    metabolites_produced: ['acido lattico', 'batteriocine', 'vitamine B'],
+    health_effects: {
+      positive: ['protezione vs patogeni', 'immunomodulazione'],
+      negative: ['alcuni ceppi resistenti antibiotici', 'opportunista in immunocompromessi']
+    },
+    optimal_range: { min: 0.1, max: 3 },
+    promoting_foods: ['alimenti fermentati', 'formaggi'],
+    inhibiting_foods: ['eccesso in condizioni normali non necessario']
+  },
+  {
+    id: 'christensenella',
+    name: 'Christensenella minuta',
+    phylum: 'Firmicutes',
+    genus: 'Christensenella',
+    species: 'minuta',
+    functions: ['associato a magrezza', 'regolazione peso', 'ereditabilità'],
+    preferred_substrates: ['fibre', 'polisaccaridi'],
+    metabolites_produced: ['acetato', 'butirrato'],
+    health_effects: {
+      positive: ['controllo peso', 'BMI basso', 'longevità', 'metabolismo efficiente'],
+      negative: []
+    },
+    optimal_range: { min: 0.5, max: 5 },
+    promoting_foods: ['verdure fibrose', 'dieta varia', 'esercizio fisico'],
+    inhibiting_foods: ['obesità', 'sedentarietà', 'dieta povera di fibre']
+  },
+  {
+    id: 'oscillospira',
+    name: 'Oscillospira',
+    phylum: 'Firmicutes',
+    genus: 'Oscillospira',
+    functions: ['produzione butirrato', 'associato a magrezza', 'digestione fibre'],
+    preferred_substrates: ['fibre complesse', 'glucuronidi'],
+    metabolites_produced: ['butirrato'],
+    health_effects: {
+      positive: ['controllo peso', 'riduzione grasso viscerale'],
+      negative: []
+    },
+    optimal_range: { min: 1, max: 8 },
+    promoting_foods: ['digiuno intermittente', 'fibre vegetali', 'verdure crude'],
+    inhibiting_foods: ['eccesso calorico', 'pasti frequenti']
+  },
+
+  // BACTEROIDETES - Espansione
+  {
+    id: 'bacteroides_fragilis',
+    name: 'Bacteroides fragilis',
+    phylum: 'Bacteroidetes',
+    genus: 'Bacteroides',
+    species: 'fragilis',
+    functions: ['produzione PSA immunomodulante', 'degradazione polisaccaridi', 'tolleranza immune'],
+    preferred_substrates: ['polisaccaridi', 'mucina', 'glicani'],
+    metabolites_produced: ['propionato', 'PSA', 'succinato'],
+    health_effects: {
+      positive: ['immunomodulazione Treg', 'protezione autoimmunità', 'barriera intestinale'],
+      negative: ['opportunista se fuori intestino']
+    },
+    optimal_range: { min: 1, max: 5 },
+    promoting_foods: ['fibre vegetali diverse', 'polisaccaridi complessi'],
+    inhibiting_foods: ['antibiotici beta-lattamici']
+  },
+  {
+    id: 'bacteroides_thetaiotaomicron',
+    name: 'Bacteroides thetaiotaomicron',
+    phylum: 'Bacteroidetes',
+    genus: 'Bacteroides',
+    species: 'thetaiotaomicron',
+    functions: ['digestione carboidrati complessi', 'cross-feeding', 'stimolazione mucosa'],
+    preferred_substrates: ['glicani dietetici', 'mucina', 'pectina'],
+    metabolites_produced: ['acetato', 'propionato', 'succinato'],
+    health_effects: {
+      positive: ['versatilità digestiva', 'educazione sistema immunitario', 'produzione muco'],
+      negative: []
+    },
+    optimal_range: { min: 2, max: 10 },
+    promoting_foods: ['varietà di fibre vegetali', 'frutta', 'verdure'],
+    inhibiting_foods: ['dieta monotona', 'carenza fibre']
+  },
+  {
+    id: 'prevotella_copri',
+    name: 'Prevotella copri',
+    phylum: 'Bacteroidetes',
+    genus: 'Prevotella',
+    species: 'copri',
+    functions: ['degradazione fibre vegetali', 'metabolismo carboidrati', 'tipico diete agrarie'],
+    preferred_substrates: ['xilano', 'arabinoxilano', 'fibre cereali'],
+    metabolites_produced: ['succinato', 'propionato'],
+    health_effects: {
+      positive: ['efficienza digestiva carboidrati', 'tipico popolazioni rurali'],
+      negative: ['associato a insulino-resistenza in alcuni studi', 'artrite reumatoide']
+    },
+    optimal_range: { min: 0, max: 20 },
+    promoting_foods: ['cereali integrali', 'dieta plant-based', 'legumi'],
+    inhibiting_foods: ['dieta ricca proteine animali', 'grassi']
+  },
+  {
+    id: 'alistipes',
+    name: 'Alistipes',
+    phylum: 'Bacteroidetes',
+    genus: 'Alistipes',
+    functions: ['produzione indolo', 'metabolismo triptofano', 'protezione intestinale'],
+    preferred_substrates: ['proteine', 'aminoacidi aromatici'],
+    metabolites_produced: ['indolo', 'acido indolpropionico', 'propionato'],
+    health_effects: {
+      positive: ['protezione barriera', 'metaboliti neuroprotettivi', 'anti-infiammatorio'],
+      negative: ['eccesso in alcune malattie epatiche']
+    },
+    optimal_range: { min: 1, max: 8 },
+    promoting_foods: ['proteine moderate', 'triptofano', 'verdure crucifere'],
+    inhibiting_foods: ['eccesso proteine', 'disbiosi']
+  },
+  {
+    id: 'parabacteroides',
+    name: 'Parabacteroides distasonis',
+    phylum: 'Bacteroidetes',
+    genus: 'Parabacteroides',
+    species: 'distasonis',
+    functions: ['metabolismo acidi biliari', 'produzione litocolato', 'immunomodulazione'],
+    preferred_substrates: ['polisaccaridi', 'acidi biliari'],
+    metabolites_produced: ['succinato', 'acidi biliari secondari'],
+    health_effects: {
+      positive: ['protezione obesità', 'regolazione metabolica', 'tolleranza immune'],
+      negative: []
+    },
+    optimal_range: { min: 0.5, max: 5 },
+    promoting_foods: ['fibre solubili', 'polifenoli'],
+    inhibiting_foods: ['grassi saturi eccessivi']
+  },
+
+  // ACTINOBACTERIA - Espansione
+  {
+    id: 'bifidobacterium_longum',
+    name: 'Bifidobacterium longum',
+    phylum: 'Actinobacteria',
+    genus: 'Bifidobacterium',
+    species: 'longum',
+    functions: ['immunomodulazione', 'asse intestino-cervello', 'produzione GABA'],
+    preferred_substrates: ['HMO', 'FOS', 'GOS', 'inulina'],
+    metabolites_produced: ['acetato', 'lattato', 'GABA', 'folato'],
+    health_effects: {
+      positive: ['riduzione ansia', 'miglioramento umore', 'immunità', 'longevità'],
+      negative: []
+    },
+    optimal_range: { min: 2, max: 10 },
+    promoting_foods: ['latte materno (HMO)', 'yogurt', 'cipolla', 'aglio', 'banana'],
+    inhibiting_foods: ['antibiotici', 'stress']
+  },
+  {
+    id: 'bifidobacterium_breve',
+    name: 'Bifidobacterium breve',
+    phylum: 'Actinobacteria',
+    genus: 'Bifidobacterium',
+    species: 'breve',
+    functions: ['fermentazione oligosaccaridi', 'produzione CLA', 'anti-allergico'],
+    preferred_substrates: ['GOS', 'lattosio', 'oligosaccaridi'],
+    metabolites_produced: ['acetato', 'lattato', 'CLA'],
+    health_effects: {
+      positive: ['riduzione allergie', 'protezione infezioni', 'salute pelle'],
+      negative: []
+    },
+    optimal_range: { min: 1, max: 8 },
+    promoting_foods: ['latte fermentato', 'prebiotici GOS'],
+    inhibiting_foods: ['antibiotici']
+  },
+  {
+    id: 'collinsella',
+    name: 'Collinsella aerofaciens',
+    phylum: 'Actinobacteria',
+    genus: 'Collinsella',
+    species: 'aerofaciens',
+    functions: ['metabolismo acidi biliari', 'produzione H2', 'deconiugazione'],
+    preferred_substrates: ['carboidrati', 'acidi biliari'],
+    metabolites_produced: ['H2', 'etanolo', 'lattato', 'formiato'],
+    health_effects: {
+      positive: ['metabolismo colesterolo'],
+      negative: ['associato a insulino-resistenza', 'aterosclerosi in eccesso', 'artrite reumatoide']
+    },
+    optimal_range: { min: 0.1, max: 3 },
+    promoting_foods: ['carboidrati semplici'],
+    inhibiting_foods: ['fibre', 'polifenoli', 'dieta plant-based']
+  },
+
+  // PROTEOBACTERIA - Espansione
+  {
+    id: 'klebsiella',
+    name: 'Klebsiella pneumoniae',
+    phylum: 'Proteobacteria',
+    genus: 'Klebsiella',
+    species: 'pneumoniae',
+    functions: ['fissazione azoto', 'metabolismo zuccheri'],
+    preferred_substrates: ['glucosio', 'lattosio', 'zuccheri semplici'],
+    metabolites_produced: ['acidi organici', 'gas'],
+    health_effects: {
+      positive: [],
+      negative: ['opportunista', 'infezioni in immunocompromessi', 'resistenza antibiotici', 'marker disbiosi']
+    },
+    optimal_range: { min: 0, max: 0.5 },
+    promoting_foods: ['zuccheri semplici', 'alcol'],
+    inhibiting_foods: ['probiotici', 'polifenoli', 'fibre prebiotiche']
+  },
+  {
+    id: 'desulfovibrio',
+    name: 'Desulfovibrio',
+    phylum: 'Proteobacteria',
+    genus: 'Desulfovibrio',
+    functions: ['riduzione solfato', 'produzione H2S'],
+    preferred_substrates: ['solfato', 'lattato', 'H2'],
+    metabolites_produced: ['H2S (idrogeno solforato)', 'acetato'],
+    health_effects: {
+      positive: [],
+      negative: ['H2S danneggia mucosa', 'associato a IBD', 'infiammazione intestinale']
+    },
+    optimal_range: { min: 0, max: 1 },
+    promoting_foods: ['conservanti con solfiti', 'vino (solfiti)', 'carne processata'],
+    inhibiting_foods: ['fibre', 'prebiotici', 'riduzione solfiti dietetici']
+  },
+  {
+    id: 'bilophila',
+    name: 'Bilophila wadsworthia',
+    phylum: 'Proteobacteria',
+    genus: 'Bilophila',
+    species: 'wadsworthia',
+    functions: ['metabolismo taurina', 'produzione H2S', 'tolleranza bile'],
+    preferred_substrates: ['taurina', 'acidi biliari', 'solfito'],
+    metabolites_produced: ['H2S', 'acetato'],
+    health_effects: {
+      positive: [],
+      negative: ['pro-infiammatorio', 'associato a dieta grassa', 'colite', 'IBD']
+    },
+    optimal_range: { min: 0, max: 0.5 },
+    promoting_foods: ['grassi saturi', 'carne rossa', 'dieta occidentale'],
+    inhibiting_foods: ['fibre', 'dieta plant-based', 'polifenoli']
+  },
+
+  // ARCHAEA
+  {
+    id: 'methanobrevibacter',
+    name: 'Methanobrevibacter smithii',
+    phylum: 'Euryarchaeota',
+    genus: 'Methanobrevibacter',
+    species: 'smithii',
+    functions: ['metanogenesi', 'rimozione H2', 'ottimizzazione fermentazione'],
+    preferred_substrates: ['H2', 'CO2', 'formiato'],
+    metabolites_produced: ['metano (CH4)'],
+    health_effects: {
+      positive: ['efficienza energetica da fibre', 'rimozione H2 per altri batteri'],
+      negative: ['eccesso associato a obesità', 'stipsi', 'rallentamento transito']
+    },
+    optimal_range: { min: 0.5, max: 5 },
+    promoting_foods: ['fibre fermentabili', 'dieta ricca H2'],
+    inhibiting_foods: ['antibiotici anti-metanogeni', 'statine (parziale)']
+  },
+
+  // FUSOBACTERIA
+  {
+    id: 'fusobacterium',
+    name: 'Fusobacterium nucleatum',
+    phylum: 'Fusobacteria',
+    genus: 'Fusobacterium',
+    species: 'nucleatum',
+    functions: ['aggregazione batterica', 'adesione mucosa'],
+    preferred_substrates: ['aminoacidi', 'peptidi'],
+    metabolites_produced: ['butirrato', 'ammoniaca', 'H2S'],
+    health_effects: {
+      positive: [],
+      negative: ['associato a cancro colon', 'malattia parodontale', 'IBD', 'marker patologico']
+    },
+    optimal_range: { min: 0, max: 0.1 },
+    promoting_foods: ['carenza igiene orale', 'dieta occidentale'],
+    inhibiting_foods: ['igiene orale', 'fibre', 'polifenoli', 'curcuma']
+  },
+
+  // FUNGI (Micobioma)
+  {
+    id: 'candida_albicans',
+    name: 'Candida albicans',
+    phylum: 'Ascomycota',
+    genus: 'Candida',
+    species: 'albicans',
+    functions: ['opportunista', 'competizione nicchie', 'dimorfismo'],
+    preferred_substrates: ['glucosio', 'zuccheri semplici', 'amido'],
+    metabolites_produced: ['etanolo', 'acetaldeide', 'gliotossine'],
+    health_effects: {
+      positive: ['parte normale micobioma in piccole quantità'],
+      negative: ['overgrowth = candidosi', 'permeabilità intestinale', 'brain fog', 'fatica']
+    },
+    optimal_range: { min: 0, max: 0.1 },
+    promoting_foods: ['zuccheri', 'carboidrati raffinati', 'alcol', 'antibiotici'],
+    inhibiting_foods: ['aglio', 'olio cocco', 'origano', 'probiotici', 'dieta low-sugar']
+  },
+  {
+    id: 'saccharomyces_boulardii',
+    name: 'Saccharomyces boulardii',
+    phylum: 'Ascomycota',
+    genus: 'Saccharomyces',
+    species: 'boulardii',
+    functions: ['probiotico lievito', 'anti-patogeni', 'supporto barriera'],
+    preferred_substrates: ['glucosio', 'maltosio'],
+    metabolites_produced: ['etanolo (minimo)', 'fattori trofici', 'proteasi'],
+    health_effects: {
+      positive: ['prevenzione diarrea', 'anti-C.difficile', 'supporto durante antibiotici', 'IBD'],
+      negative: []
+    },
+    optimal_range: { min: 0, max: 1 },
+    promoting_foods: ['supplementazione diretta', 'kombucha', 'kefir'],
+    inhibiting_foods: ['non colonizza permanentemente']
+  },
+
+  // ALTRI BATTERI IMPORTANTI
+  {
+    id: 'oxalobacter',
+    name: 'Oxalobacter formigenes',
+    phylum: 'Proteobacteria',
+    genus: 'Oxalobacter',
+    species: 'formigenes',
+    functions: ['degradazione ossalato', 'prevenzione calcoli renali'],
+    preferred_substrates: ['ossalato'],
+    metabolites_produced: ['formiato', 'CO2'],
+    health_effects: {
+      positive: ['riduzione ossalato', 'prevenzione calcoli renali', 'protezione nefropatia'],
+      negative: []
+    },
+    optimal_range: { min: 0.1, max: 2 },
+    promoting_foods: ['prebiotici', 'probiotici'],
+    inhibiting_foods: ['antibiotici (molto sensibile)', 'fluorochinoloni']
+  },
+  {
+    id: 'lactococcus',
+    name: 'Lactococcus lactis',
+    phylum: 'Firmicutes',
+    genus: 'Lactococcus',
+    species: 'lactis',
+    functions: ['starter fermentazione', 'produzione nisina', 'anti-patogeni'],
+    preferred_substrates: ['lattosio', 'glucosio'],
+    metabolites_produced: ['acido lattico', 'nisina', 'diacetile'],
+    health_effects: {
+      positive: ['probiotico', 'anti-Listeria', 'delivery farmaci (biotech)'],
+      negative: []
+    },
+    optimal_range: { min: 0.1, max: 3 },
+    promoting_foods: ['formaggi freschi', 'latticello', 'panna acida'],
+    inhibiting_foods: ['antibiotici']
+  },
+  {
+    id: 'veillonella',
+    name: 'Veillonella',
+    phylum: 'Firmicutes',
+    genus: 'Veillonella',
+    functions: ['metabolismo lattato', 'conversione lattato-propionato', 'atleti elite'],
+    preferred_substrates: ['lattato', 'piruvato'],
+    metabolites_produced: ['propionato', 'acetato', 'CO2', 'H2'],
+    health_effects: {
+      positive: ['rimozione lattato intestinale', 'associato a performance atletica elite', 'energia da lattato'],
+      negative: []
+    },
+    optimal_range: { min: 0.5, max: 5 },
+    promoting_foods: ['alimenti fermentati', 'esercizio fisico regolare'],
+    inhibiting_foods: ['sedentarietà']
+  },
+  {
+    id: 'dialister',
+    name: 'Dialister',
+    phylum: 'Firmicutes',
+    genus: 'Dialister',
+    functions: ['produzione propionato', 'fermentazione'],
+    preferred_substrates: ['lattato', 'peptidi'],
+    metabolites_produced: ['propionato', 'acetato'],
+    health_effects: {
+      positive: ['associato a umore positivo', 'qualità vita'],
+      negative: []
+    },
+    optimal_range: { min: 0.5, max: 5 },
+    promoting_foods: ['fibre', 'dieta variata'],
+    inhibiting_foods: ['depressione (correlazione inversa)']
+  },
+  {
+    id: 'sutterella',
+    name: 'Sutterella',
+    phylum: 'Proteobacteria',
+    genus: 'Sutterella',
+    functions: ['adesione mucosa', 'modulazione IgA'],
+    preferred_substrates: ['aminoacidi', 'acidi organici'],
+    metabolites_produced: ['acidi organici'],
+    health_effects: {
+      positive: ['parte normale microbiota'],
+      negative: ['aumentato in autismo (controverso)', 'IBD']
+    },
+    optimal_range: { min: 0.1, max: 3 },
+    promoting_foods: ['proteine'],
+    inhibiting_foods: ['non chiaro']
+  },
+  {
+    id: 'dorea',
+    name: 'Dorea',
+    phylum: 'Firmicutes',
+    genus: 'Dorea',
+    functions: ['produzione gas', 'fermentazione', 'metabolismo mucina'],
+    preferred_substrates: ['carboidrati', 'mucina'],
+    metabolites_produced: ['acetato', 'etanolo', 'H2', 'CO2'],
+    health_effects: {
+      positive: ['fermentazione normale'],
+      negative: ['aumentato in IBS', 'eccesso gas']
+    },
+    optimal_range: { min: 1, max: 8 },
+    promoting_foods: ['fibre fermentabili'],
+    inhibiting_foods: ['riduzione FODMAP se IBS']
+  },
+  {
+    id: 'megasphaera',
+    name: 'Megasphaera',
+    phylum: 'Firmicutes',
+    genus: 'Megasphaera',
+    functions: ['produzione butirrato da lattato', 'cross-feeding'],
+    preferred_substrates: ['lattato', 'glucosio'],
+    metabolites_produced: ['butirrato', 'propionato', 'valerato', 'caproato'],
+    health_effects: {
+      positive: ['produzione SCFA a catena lunga', 'energia colonociti'],
+      negative: []
+    },
+    optimal_range: { min: 0.1, max: 3 },
+    promoting_foods: ['lattobacilli (producono lattato)', 'fibre'],
+    inhibiting_foods: ['carenza lattobacilli']
   }
 ]
 
@@ -326,6 +844,120 @@ export const METABOLIC_PATHWAYS: MetabolicPathway[] = [
     },
     activating_foods: ['tacchino', 'pollo', 'uova', 'semi zucca', 'noci', 'banane', 'cacao'],
     inhibiting_foods: ['carenza proteica', 'disbiosi']
+  },
+
+  // ==================== NUOVI PATHWAY AGGIUNTI ====================
+  {
+    id: 'lactate_propionate',
+    name: 'Conversione Lattato-Propionato',
+    description: 'Batteri che convertono lattato (da esercizio o fermentazione) in propionato',
+    bacteria_involved: ['veillonella', 'megasphaera', 'propionibacterium'],
+    substrates: ['lattato', 'piruvato'],
+    products: ['propionato', 'acetato'],
+    athletic_impact: {
+      benefit: 'Rimozione lattato intestinale, energia extra, performance elite',
+      mechanism: 'Veillonella aumentata negli atleti elite converte lattato in propionato utilizzabile'
+    },
+    activating_foods: ['esercizio fisico regolare', 'alimenti fermentati con lattobacilli'],
+    inhibiting_foods: ['sedentarietà']
+  },
+  {
+    id: 'h2s_production',
+    name: 'Produzione H2S (Idrogeno Solforato)',
+    description: 'Batteri solfato-riduttori producono H2S, tossico per mucosa',
+    bacteria_involved: ['desulfovibrio', 'bilophila'],
+    substrates: ['solfato', 'taurina', 'cisteina', 'solfiti'],
+    products: ['H2S', 'solfuro'],
+    athletic_impact: {
+      benefit: 'NEGATIVO - H2S danneggia mucosa, infiammazione, riduce assorbimento',
+      mechanism: 'H2S inibisce citocromo c ossidasi, danneggia colonociti'
+    },
+    activating_foods: ['carne rossa', 'grassi saturi', 'vino con solfiti', 'conservanti'],
+    inhibiting_foods: ['fibre', 'dieta plant-based', 'riduzione solfiti']
+  },
+  {
+    id: 'oxalate_degradation',
+    name: 'Degradazione Ossalato',
+    description: 'Batteri che degradano ossalato prevenendo calcoli renali',
+    bacteria_involved: ['oxalobacter', 'lactobacillus'],
+    substrates: ['ossalato'],
+    products: ['formiato', 'CO2'],
+    athletic_impact: {
+      benefit: 'Prevenzione calcoli renali, importante per atleti disidratati',
+      mechanism: 'Riduce ossalato assorbito, protegge reni durante disidratazione'
+    },
+    activating_foods: ['prebiotici', 'calcio con pasti (lega ossalato)'],
+    inhibiting_foods: ['antibiotici (uccidono Oxalobacter)', 'eccesso spinaci/rabarbaro']
+  },
+  {
+    id: 'gaba_production',
+    name: 'Produzione GABA',
+    description: 'Batteri producono GABA, neurotrasmettitore inibitorio',
+    bacteria_involved: ['lactobacillus', 'bifidobacterium_longum', 'lactobacillus_brevis'],
+    substrates: ['glutammato', 'glutammina'],
+    products: ['GABA'],
+    athletic_impact: {
+      benefit: 'Riduzione ansia pre-gara, miglior sonno, recupero mentale',
+      mechanism: 'GABA intestinale comunica con cervello via nervo vago'
+    },
+    activating_foods: ['kimchi', 'tempeh', 'miso', 'tè oolong', 'pomodori'],
+    inhibiting_foods: ['stress cronico', 'disbiosi']
+  },
+  {
+    id: 'vitamin_k_synthesis',
+    name: 'Sintesi Vitamina K2',
+    description: 'Batteri sintetizzano vitamina K2 (menachinone) essenziale per ossa e coagulazione',
+    bacteria_involved: ['escherichia', 'bacteroides', 'lactococcus'],
+    substrates: ['precursori isoprenoidi'],
+    products: ['vitamina K2 (MK-7, MK-9)'],
+    athletic_impact: {
+      benefit: 'Salute ossea, prevenzione fratture stress, coagulazione',
+      mechanism: 'K2 attiva osteocalcina per deposizione calcio in ossa'
+    },
+    activating_foods: ['natto (fermentato)', 'formaggi stagionati', 'crauti'],
+    inhibiting_foods: ['antibiotici prolungati', 'carenza grassi']
+  },
+  {
+    id: 'folate_synthesis',
+    name: 'Sintesi Folato',
+    description: 'Batteri sintetizzano folato (vitamina B9) essenziale per DNA e metilazione',
+    bacteria_involved: ['bifidobacterium', 'lactobacillus', 'streptococcus_thermophilus'],
+    substrates: ['GTP', 'p-aminobenzoato'],
+    products: ['folato', 'tetraidrofolato'],
+    athletic_impact: {
+      benefit: 'Sintesi DNA, rigenerazione cellulare, metilazione, eritropoiesi',
+      mechanism: 'Folato essenziale per divisione cellulare e produzione globuli rossi'
+    },
+    activating_foods: ['yogurt', 'kefir', 'verdure a foglia verde'],
+    inhibiting_foods: ['antibiotici', 'alcol']
+  },
+  {
+    id: 'histamine_metabolism',
+    name: 'Metabolismo Istamina',
+    description: 'Alcuni batteri producono istamina (pro-infiammatoria), altri la degradano',
+    bacteria_involved: ['lactobacillus', 'morganella', 'klebsiella'],
+    substrates: ['istidina'],
+    products: ['istamina'],
+    athletic_impact: {
+      benefit: 'VARIABILE - Eccesso istamina causa sintomi allergici, infiammazione',
+      mechanism: 'Batteri con istidina decarbossilasi producono istamina da cibi fermentati'
+    },
+    activating_foods: ['cibi fermentati vecchi', 'pesce non fresco', 'vino rosso', 'formaggi stagionati'],
+    inhibiting_foods: ['cibi freschi', 'Lactobacillus rhamnosus GG (degrada istamina)']
+  },
+  {
+    id: 'equol_production',
+    name: 'Produzione Equolo',
+    description: 'Conversione di daidzeina (isoflavone soia) in equolo, potente fitoestrogeno',
+    bacteria_involved: ['lactobacillus', 'bifidobacterium', 'slackia'],
+    substrates: ['daidzeina', 'isoflavoni soia'],
+    products: ['equolo', 'O-DMA'],
+    athletic_impact: {
+      benefit: 'Antiossidante, salute cardiovascolare, ossa (solo ~30-50% popolazione produce equolo)',
+      mechanism: 'Equolo più biodisponibile e potente della daidzeina'
+    },
+    activating_foods: ['soia', 'tofu', 'tempeh', 'edamame', 'latte soia'],
+    inhibiting_foods: ['antibiotici', 'assenza batteri equolo-produttori']
   }
 ]
 
