@@ -94,6 +94,14 @@ const SPORT_SUPPLEMENT_BRANDS = [
   "Prozis",
   "Bulk",
   "MNSTRY",
+  // New brands added
+  "Precision Hydration",
+  "HIGH5",
+  "Nduranz",
+  "TORQ",
+  "Hammer Nutrition",
+  "Tailwind",
+  "Skratch Labs",
 ]
 
 const SPORT_SUPPLEMENT_TYPES = [
@@ -511,7 +519,12 @@ export function SettingsContent({
 
     try {
       if (athleteData?.id) {
-        // Get existing constraints
+        const sportSupplementsData = {
+          brands: sportSupplementBrands,
+          types: sportSupplementTypes,
+        }
+
+        // 1. Save to athlete_constraints.notes (primary storage)
         const { data: constraints } = await supabase
           .from("athlete_constraints")
           .select("id, notes")
@@ -529,10 +542,7 @@ export function SettingsContent({
 
         const updatedNotes = {
           ...existingNotes,
-          sport_supplements: {
-            brands: sportSupplementBrands,
-            types: sportSupplementTypes,
-          },
+          sport_supplements: sportSupplementsData,
         }
 
         if (constraints?.id) {
@@ -549,6 +559,29 @@ export function SettingsContent({
             dietary_limits: [],
             notes: JSON.stringify(updatedNotes),
           })
+        }
+
+        // 2. Also save to annual_training_plans.config_json for nutrition-plan component
+        const { data: existingPlan } = await supabase
+          .from("annual_training_plans")
+          .select("id, config_json")
+          .eq("athlete_id", athleteData.id)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .single()
+
+        if (existingPlan) {
+          const updatedConfig = {
+            ...(existingPlan.config_json || {}),
+            sport_supplements: sportSupplementsData,
+          }
+
+          await supabase
+            .from("annual_training_plans")
+            .update({ config_json: updatedConfig })
+            .eq("id", existingPlan.id)
+          
+          console.log("[v0] Sport supplements saved to annual_training_plans:", sportSupplementsData)
         }
 
         setSportSupplementsSuccess(true)
