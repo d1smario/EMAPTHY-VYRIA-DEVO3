@@ -1175,6 +1175,625 @@ export const METABOLIC_GENES_DATABASE: MetabolicGene[] = [
     related_genes: ["TNF", "IL1B", "IL10", "CRP"],
     biomarkers: ["IL-6 sierico", "PCR", "VES", "Ferritina"],
     test_panels: ["Panel citochine", "Markers infiammazione"]
+  },
+
+  // ============================================
+  // NUOVI GENI AGGIUNTI - METABOLISMO E PERFORMANCE
+  // ============================================
+
+  // METABOLISMO ENERGETICO
+  {
+    id: "ucp2",
+    symbol: "UCP2",
+    full_name: "Uncoupling Protein 2",
+    chromosome: "11q13.4",
+    category: "mitochondrial",
+    pathway: ["termogenesi", "disaccoppiamento_mitocondriale", "protezione_ROS"],
+    function: "Disaccoppia la fosforilazione ossidativa, dissipando energia come calore. Protegge dai ROS riducendo potenziale di membrana mitocondriale.",
+    expression_states: {
+      normal: {
+        state: "normal",
+        description: "Bilancio tra efficienza energetica e protezione antiossidante",
+        metabolic_consequences: ["Produzione ATP normale", "Protezione ROS adeguata"],
+        symptoms: [],
+        nutritional_recommendations: ["Dieta bilanciata"],
+        supplement_recommendations: [],
+        training_recommendations: ["Allenamento standard"],
+        foods_to_avoid: [],
+        foods_to_prefer: []
+      },
+      under_expressed: {
+        state: "under_expressed",
+        description: "Alta efficienza energetica ma vulnerabilità a stress ossidativo",
+        metabolic_consequences: ["Maggiore produzione ATP", "Aumento ROS", "Danno mitocondriale accelerato"],
+        symptoms: ["Affaticamento post-allenamento intenso", "Recupero lento", "Invecchiamento precoce"],
+        nutritional_recommendations: ["Aumentare antiossidanti", "Dieta ricca polifenoli"],
+        supplement_recommendations: ["CoQ10", "NAC", "Vitamina C", "Vitamina E", "Alpha-lipoic acid"],
+        training_recommendations: ["Evitare overtraining", "Monitorare recupero", "Periodizzazione attenta"],
+        foods_to_avoid: ["Cibi pro-ossidanti", "Fritture", "Oli raffinati"],
+        foods_to_prefer: ["Frutti di bosco", "Cacao", "Tè verde", "Verdure colorate"]
+      },
+      over_expressed: {
+        state: "over_expressed",
+        description: "Bassa efficienza energetica - dispersione come calore",
+        metabolic_consequences: ["Ridotta produzione ATP", "Termogenesi aumentata", "Difficoltà a mantenere peso"],
+        symptoms: ["Difficoltà a ingrassare", "Sensazione di caldo", "Fame frequente", "Fatica energetica"],
+        nutritional_recommendations: ["Aumentare calorie", "Carboidrati frequenti"],
+        supplement_recommendations: ["Creatina", "Ribosio"],
+        training_recommendations: ["Attenzione a deficit calorico", "Recupero adeguato"],
+        foods_to_avoid: ["Caffeina eccessiva (aumenta UCP)"],
+        foods_to_prefer: ["Carboidrati complessi", "Grassi sani", "Proteine"]
+      }
+    },
+    related_genes: ["UCP1", "UCP3", "PPARGC1A", "SIRT1"],
+    biomarkers: ["Spesa energetica a riposo", "Markers stress ossidativo"],
+    test_panels: ["Calorimetria indiretta", "Panel stress ossidativo"]
+  },
+
+  {
+    id: "sirt1",
+    symbol: "SIRT1",
+    full_name: "Sirtuina 1",
+    chromosome: "10q21.3",
+    category: "mitochondrial",
+    pathway: ["longevità", "biogenesi_mitocondriale", "metabolismo_NAD"],
+    function: "Deacetilasi NAD-dipendente. Regolatore chiave di metabolismo, infiammazione e longevità. Attiva PGC-1α e altre vie metaboliche.",
+    expression_states: {
+      normal: {
+        state: "normal",
+        description: "Regolazione metabolica efficiente, risposta adeguata a restrizione calorica",
+        metabolic_consequences: ["Metabolismo flessibile", "Risposta appropriata a digiuno"],
+        symptoms: [],
+        nutritional_recommendations: ["Dieta varia con periodi di restrizione"],
+        supplement_recommendations: [],
+        training_recommendations: ["Mix aerobico e forza"],
+        foods_to_avoid: [],
+        foods_to_prefer: []
+      },
+      under_expressed: {
+        state: "under_expressed",
+        description: "Ridotta capacità di rispondere a stress metabolico e restrizione calorica",
+        metabolic_consequences: ["Resistenza insulinica", "Biogenesi mitocondriale ridotta", "Infiammazione cronica"],
+        symptoms: ["Difficoltà a perdere peso", "Fatica cronica", "Invecchiamento accelerato"],
+        nutritional_recommendations: ["Digiuno intermittente", "Restrizione calorica periodica", "Resveratrolo"],
+        supplement_recommendations: ["NAD+ precursori (NMN, NR)", "Resveratrolo", "Pterostilbene", "Quercetina"],
+        training_recommendations: ["Esercizio regolare (attiva SIRT1)", "HIIT", "Allenamento a digiuno"],
+        foods_to_avoid: ["Eccesso calorico cronico", "Zuccheri", "Alcol eccessivo"],
+        foods_to_prefer: ["Uva rossa", "Mirtilli", "Arachidi", "Cacao", "Olio oliva"]
+      },
+      over_expressed: {
+        state: "over_expressed",
+        description: "Iperattivazione - potenziale catabolismo eccessivo",
+        metabolic_consequences: ["Catabolismo muscolare", "Difficoltà a costruire massa"],
+        symptoms: ["Perdita massa muscolare", "Difficoltà recupero"],
+        nutritional_recommendations: ["Evitare deficit calorico", "Proteine adeguate"],
+        supplement_recommendations: ["Leucina", "HMB", "Creatina"],
+        training_recommendations: ["Limitare cardio eccessivo", "Focus forza con recupero"],
+        foods_to_avoid: ["Restrizione calorica eccessiva"],
+        foods_to_prefer: ["Proteine complete", "Carboidrati post-allenamento"]
+      }
+    },
+    related_genes: ["SIRT3", "PPARGC1A", "FOXO3", "NAMPT"],
+    biomarkers: ["NAD+/NADH ratio", "Markers aging"],
+    test_panels: ["Panel longevità", "Metabolomica NAD"]
+  },
+
+  {
+    id: "ampk",
+    symbol: "PRKAA1/PRKAA2",
+    full_name: "AMP-activated Protein Kinase",
+    chromosome: "5p13.1 / 1p32.2",
+    category: "mitochondrial",
+    pathway: ["sensore_energetico", "biogenesi_mitocondriale", "autofagia", "lipogenesi"],
+    function: "Sensore centrale dello stato energetico cellulare. Attivato da deplezione ATP. Promuove catabolismo, inibisce anabolismo.",
+    expression_states: {
+      normal: {
+        state: "normal",
+        description: "Risposta adeguata a stress energetico",
+        metabolic_consequences: ["Switch efficiente tra fed/fasted", "Metabolismo flessibile"],
+        symptoms: [],
+        nutritional_recommendations: ["Pasti regolari con occasionale digiuno"],
+        supplement_recommendations: [],
+        training_recommendations: ["Varietà di intensità"],
+        foods_to_avoid: [],
+        foods_to_prefer: []
+      },
+      under_expressed: {
+        state: "under_expressed",
+        description: "Ridotta capacità di rispondere a stress energetico",
+        metabolic_consequences: ["Insulino-resistenza", "Accumulo lipidico", "Ridotta autofagia"],
+        symptoms: ["Aumento peso", "Sindrome metabolica", "Fatica cronica"],
+        nutritional_recommendations: ["Digiuno intermittente", "Restrizione calorica", "Low-carb ciclico"],
+        supplement_recommendations: ["Berberina", "Metformina (se indicato)", "EGCG", "Acido alfa-lipoico"],
+        training_recommendations: ["Esercizio intenso (attiva AMPK)", "HIIT", "Allenamento a digiuno"],
+        foods_to_avoid: ["Eccesso carboidrati", "Pasti frequenti", "Snacking continuo"],
+        foods_to_prefer: ["Tè verde", "Curcuma", "Aceto di mele", "Verdure amare"]
+      },
+      over_expressed: {
+        state: "over_expressed",
+        description: "Iperattivazione catabolica",
+        metabolic_consequences: ["Catabolismo eccessivo", "Difficoltà sintesi proteica", "Ipoglicemia"],
+        symptoms: ["Perdita muscolare", "Ipoglicemia", "Affaticamento cronico"],
+        nutritional_recommendations: ["Evitare deficit calorico", "Carboidrati regolari", "Proteine elevate"],
+        supplement_recommendations: ["Leucina", "Insulina-mimetici naturali post-allenamento"],
+        training_recommendations: ["Evitare overtraining", "Nutrizione intra-workout"],
+        foods_to_avoid: ["Digiuno prolungato", "Deficit calorico cronico"],
+        foods_to_prefer: ["Carboidrati intorno allenamento", "Proteine frequenti"]
+      }
+    },
+    related_genes: ["SIRT1", "PPARGC1A", "MTOR", "ACC"],
+    biomarkers: ["AMP/ATP ratio", "Markers metabolici"],
+    test_panels: ["Panel metabolico avanzato"]
+  },
+
+  // STRESS OSSIDATIVO
+  {
+    id: "gpx1",
+    symbol: "GPX1",
+    full_name: "Glutatione Perossidasi 1",
+    chromosome: "3p21.31",
+    category: "antioxidant",
+    pathway: ["difesa_antiossidante", "detossificazione_perossidi", "ciclo_glutatione"],
+    function: "Enzima antiossidante selenio-dipendente. Riduce perossido di idrogeno e perossidi lipidici usando glutatione.",
+    expression_states: {
+      normal: {
+        state: "normal",
+        description: "Difesa antiossidante efficiente",
+        metabolic_consequences: ["Neutralizzazione ROS efficace", "Protezione lipidi membrana"],
+        symptoms: [],
+        nutritional_recommendations: ["Selenio adeguato", "Antiossidanti nella dieta"],
+        supplement_recommendations: [],
+        training_recommendations: ["Allenamento standard con recupero"],
+        foods_to_avoid: [],
+        foods_to_prefer: []
+      },
+      under_expressed: {
+        state: "under_expressed",
+        description: "Vulnerabilità a stress ossidativo - DIFESA COMPROMESSA",
+        metabolic_consequences: ["Accumulo ROS", "Danno lipidico", "Danno DNA", "Infiammazione cronica"],
+        symptoms: ["Affaticamento", "Recupero lento", "Infezioni frequenti", "Invecchiamento precoce", "Dolori muscolari persistenti"],
+        nutritional_recommendations: ["Selenio (200mcg/die)", "Cisteina/NAC", "Antiossidanti elevati"],
+        supplement_recommendations: ["Selenio", "NAC (N-acetil-cisteina)", "Glutatione liposomiale", "Vitamina C", "Alpha-lipoic acid"],
+        training_recommendations: ["Evitare HIIT eccessivo", "Recupero prioritario", "Antiossidanti post-workout"],
+        foods_to_avoid: ["Cibi ossidati", "Fritture", "Carni bruciate", "Oli raffinati"],
+        foods_to_prefer: ["Noci del Brasile (selenio)", "Aglio", "Crucifere", "Avocado", "Uova"]
+      },
+      over_expressed: {
+        state: "over_expressed",
+        description: "Sistema antiossidante iperattivo",
+        metabolic_consequences: ["Riduzione ROS signaling benefico", "Ridotta adattamento a esercizio"],
+        symptoms: ["Ridotto adattamento allenamento", "Plateau performance"],
+        nutritional_recommendations: ["Evitare mega-dosi antiossidanti"],
+        supplement_recommendations: ["Evitare supplementazione antiossidante elevata"],
+        training_recommendations: ["Antiossidanti lontano da allenamento", "Periodizzare supplementazione"],
+        foods_to_avoid: ["Mega-dosi vitamina C/E intorno allenamento"],
+        foods_to_prefer: ["Antiossidanti da cibo, non supplementi"]
+      },
+      polymorphism: {
+        state: "polymorphism",
+        description: "Variante Pro198Leu - attività ridotta del 30%",
+        metabolic_consequences: ["Ridotta capacità antiossidante", "Maggior rischio cardiovascolare"],
+        symptoms: ["Simili a under_expressed ma più moderati"],
+        nutritional_recommendations: ["Selenio elevato", "Antiossidanti costanti"],
+        supplement_recommendations: ["Selenio (100-200mcg)", "NAC", "Vitamina E naturale"],
+        training_recommendations: ["Monitorare markers stress ossidativo"],
+        foods_to_avoid: ["Pro-ossidanti"],
+        foods_to_prefer: ["Noci Brasile", "Pesce", "Uova", "Funghi"]
+      }
+    },
+    related_genes: ["GPX4", "SOD2", "CAT", "GSR", "GCLC"],
+    biomarkers: ["Glutatione ridotto/ossidato", "MDA", "8-OHdG", "Selenio sierico"],
+    test_panels: ["Panel stress ossidativo", "Minerali traccia"]
+  },
+
+  {
+    id: "nrf2",
+    symbol: "NFE2L2",
+    full_name: "Nuclear Factor Erythroid 2-Related Factor 2",
+    chromosome: "2q31.2",
+    category: "antioxidant",
+    pathway: ["risposta_antiossidante", "detossificazione_fase2", "protezione_cellulare"],
+    function: "Fattore di trascrizione master della risposta antiossidante. Regola oltre 200 geni citoprotettivi.",
+    expression_states: {
+      normal: {
+        state: "normal",
+        description: "Risposta antiossidante adattiva efficiente",
+        metabolic_consequences: ["Induzione enzimi fase 2 appropriata", "Protezione da tossine"],
+        symptoms: [],
+        nutritional_recommendations: ["Crucifere regolari", "Polifenoli"],
+        supplement_recommendations: [],
+        training_recommendations: ["Esercizio regolare (attiva NRF2)"],
+        foods_to_avoid: [],
+        foods_to_prefer: []
+      },
+      under_expressed: {
+        state: "under_expressed",
+        description: "Ridotta capacità di risposta a stress - VULNERABILITA'",
+        metabolic_consequences: ["Ridotta detossificazione", "Accumulo tossine", "Danno ossidativo cronico"],
+        symptoms: ["Sensibilità chimica multipla", "Fatica cronica", "Brain fog", "Intolleranze alimentari"],
+        nutritional_recommendations: ["Sulforafano (broccoli)", "Curcuma", "Tè verde", "Rosmarino"],
+        supplement_recommendations: ["Sulforafano", "Curcumina", "EGCG", "Acido alfa-lipoico", "NAC"],
+        training_recommendations: ["Esercizio moderato regolare", "Evitare inquinamento durante sport outdoor"],
+        foods_to_avoid: ["Pesticidi", "Cibi processati", "Additivi", "Alcol"],
+        foods_to_prefer: ["Broccoli", "Cavolfiore", "Cavolo", "Rucola", "Aglio", "Cipolla", "Curcuma"]
+      },
+      over_expressed: {
+        state: "over_expressed",
+        description: "Iperattivazione cronica (raro, spesso compensatorio)",
+        metabolic_consequences: ["Potenziale resistenza a chemioterapia (in cancro)", "Alterato metabolismo farmaci"],
+        symptoms: ["Resistenza a alcuni farmaci"],
+        nutritional_recommendations: ["Bilanciare attivatori NRF2"],
+        supplement_recommendations: ["Consultare specialista per farmaci"],
+        training_recommendations: ["Standard"],
+        foods_to_avoid: ["Eccesso sulforafano se in terapia"],
+        foods_to_prefer: ["Dieta bilanciata"]
+      }
+    },
+    related_genes: ["KEAP1", "NQO1", "HO1", "GCLC", "GST"],
+    biomarkers: ["NQO1 attività", "Glutatione", "Markers detox"],
+    test_panels: ["Panel detossificazione", "Genomica funzionale"]
+  },
+
+  // INFIAMMAZIONE
+  {
+    id: "tnf",
+    symbol: "TNF",
+    full_name: "Tumor Necrosis Factor Alpha",
+    chromosome: "6p21.33",
+    category: "inflammation",
+    pathway: ["infiammazione", "immunità_innata", "apoptosi"],
+    function: "Citochina pro-infiammatoria centrale. Regola risposta immunitaria, infiammazione e metabolismo.",
+    expression_states: {
+      normal: {
+        state: "normal",
+        description: "Risposta infiammatoria appropriata a stimoli",
+        metabolic_consequences: ["Difesa immune efficace", "Risoluzione infiammazione"],
+        symptoms: [],
+        nutritional_recommendations: ["Dieta anti-infiammatoria moderata"],
+        supplement_recommendations: [],
+        training_recommendations: ["Allenamento standard"],
+        foods_to_avoid: [],
+        foods_to_prefer: []
+      },
+      under_expressed: {
+        state: "under_expressed",
+        description: "Risposta immunitaria debole",
+        metabolic_consequences: ["Suscettibilità infezioni", "Ridotta capacità di combattere patogeni"],
+        symptoms: ["Infezioni frequenti", "Guarigione lenta", "Malattie ricorrenti"],
+        nutritional_recommendations: ["Supportare immunità", "Zinco", "Vitamina D"],
+        supplement_recommendations: ["Zinco", "Vitamina D", "Vitamina C", "Echinacea (acuto)"],
+        training_recommendations: ["Non esagerare (deprime ulteriormente)"],
+        foods_to_avoid: ["Zuccheri (deprimono immunità)"],
+        foods_to_prefer: ["Funghi medicinali", "Aglio", "Zenzero", "Proteine adeguate"]
+      },
+      over_expressed: {
+        state: "over_expressed",
+        description: "Infiammazione cronica sistemica - STATO PERICOLOSO",
+        metabolic_consequences: ["Insulino-resistenza", "Catabolismo muscolare", "Danno tissutale", "Aterosclerosi", "Depressione"],
+        symptoms: ["Dolori diffusi", "Fatica cronica", "Depressione", "Difficoltà recupero", "Aumento peso viscerale"],
+        nutritional_recommendations: ["Dieta anti-infiammatoria stretta", "Omega-3 elevati", "Eliminare trigger"],
+        supplement_recommendations: ["Omega-3 (3-4g EPA+DHA)", "Curcumina + piperina", "Boswellia", "SPM", "Vitamina D"],
+        training_recommendations: ["Ridurre intensità", "Focus su recupero", "Evitare overreaching"],
+        foods_to_avoid: ["Zuccheri", "Omega-6 eccessivi", "Trans fat", "Alcol", "Carne processata"],
+        foods_to_prefer: ["Pesce grasso", "Olio oliva", "Verdure", "Frutti di bosco", "Noci"]
+      },
+      polymorphism: {
+        state: "polymorphism",
+        description: "Variante -308 G>A - maggiore produzione TNF",
+        metabolic_consequences: ["Tendenza infiammatoria genetica", "Risposta esagerata a stimoli"],
+        symptoms: ["Infiammazione più facile", "Recupero più lento"],
+        nutritional_recommendations: ["Dieta anti-infiammatoria preventiva costante"],
+        supplement_recommendations: ["Omega-3 quotidiani", "Curcumina"],
+        training_recommendations: ["Recupero extra", "Monitorare markers"],
+        foods_to_avoid: ["Trigger infiammatori"],
+        foods_to_prefer: ["Anti-infiammatori naturali quotidiani"]
+      }
+    },
+    related_genes: ["IL6", "IL1B", "NFKB", "IL10"],
+    biomarkers: ["TNF-alpha sierico", "PCR", "IL-6", "Fibrinogeno"],
+    test_panels: ["Panel citochine", "Markers infiammazione"]
+  },
+
+  {
+    id: "crp",
+    symbol: "CRP",
+    full_name: "C-Reactive Protein",
+    chromosome: "1q23.2",
+    category: "inflammation",
+    pathway: ["fase_acuta", "infiammazione_sistemica", "rischio_cardiovascolare"],
+    function: "Proteina di fase acuta prodotta dal fegato. Marker sensibile di infiammazione sistemica.",
+    expression_states: {
+      normal: {
+        state: "normal",
+        description: "Livelli basali bassi (<1 mg/L), risposta appropriata a infezioni",
+        metabolic_consequences: ["Infiammazione sotto controllo", "Basso rischio CV"],
+        symptoms: [],
+        nutritional_recommendations: ["Mantenere dieta sana"],
+        supplement_recommendations: [],
+        training_recommendations: ["Continuare attività regolare"],
+        foods_to_avoid: [],
+        foods_to_prefer: []
+      },
+      under_expressed: {
+        state: "under_expressed",
+        description: "Raro - possibile deficit epatico",
+        metabolic_consequences: ["Ridotta risposta fase acuta"],
+        symptoms: ["Diagnosi ritardata infezioni"],
+        nutritional_recommendations: ["Supportare funzione epatica"],
+        supplement_recommendations: [],
+        training_recommendations: ["Standard"],
+        foods_to_avoid: ["Alcol"],
+        foods_to_prefer: ["Alimenti epatoprotettivi"]
+      },
+      over_expressed: {
+        state: "over_expressed",
+        description: "hsCRP elevata (>3 mg/L) - INFIAMMAZIONE CRONICA",
+        metabolic_consequences: ["Alto rischio cardiovascolare", "Insulino-resistenza", "Disfunzione endoteliale"],
+        symptoms: ["Spesso asintomatica", "Fatica", "Malessere generale"],
+        nutritional_recommendations: ["Dieta mediterranea", "Omega-3", "Fibre elevate", "Perdere peso se sovrappeso"],
+        supplement_recommendations: ["Omega-3", "Curcumina", "Vitamina D", "Magnesio"],
+        training_recommendations: ["Esercizio regolare moderato (abbassa CRP)", "Evitare sedentarietà"],
+        foods_to_avoid: ["Zuccheri", "Grassi trans", "Cibi ultra-processati", "Alcol eccessivo"],
+        foods_to_prefer: ["Pesce", "Olio oliva", "Verdure", "Frutta", "Noci", "Legumi"]
+      }
+    },
+    related_genes: ["IL6", "TNF", "SAA1"],
+    biomarkers: ["hsCRP", "Fibrinogeno", "Ferritina"],
+    test_panels: ["Risk cardiovascolare", "Panel infiammazione"]
+  },
+
+  // METABOLISMO AMINOACIDI - BCAA
+  {
+    id: "bcat2",
+    symbol: "BCAT2",
+    full_name: "Branched Chain Amino Acid Transaminase 2",
+    chromosome: "19q13.33",
+    category: "amino_acid",
+    pathway: ["catabolismo_BCAA", "sintesi_glutammato", "metabolismo_muscolare"],
+    function: "Primo enzima nel catabolismo dei BCAA. Converte leucina, isoleucina e valina nei rispettivi chetoacidi.",
+    expression_states: {
+      normal: {
+        state: "normal",
+        description: "Metabolismo BCAA efficiente",
+        metabolic_consequences: ["Utilizzo BCAA per energia e sintesi", "Bilancio azotato"],
+        symptoms: [],
+        nutritional_recommendations: ["Proteine adeguate"],
+        supplement_recommendations: [],
+        training_recommendations: ["Standard"],
+        foods_to_avoid: [],
+        foods_to_prefer: []
+      },
+      under_expressed: {
+        state: "under_expressed",
+        description: "Accumulo BCAA - potenziale tossicità",
+        metabolic_consequences: ["Accumulo BCAA nel sangue", "Interferenza con trasporto aminoacidi cerebrali", "Simil-MSUD lieve"],
+        symptoms: ["Confusione mentale con eccesso proteine", "Fatica", "Difficoltà concentrazione"],
+        nutritional_recommendations: ["Moderare proteine totali", "Evitare mega-dosi BCAA"],
+        supplement_recommendations: ["Evitare BCAA supplementari", "B6 (cofattore)", "Carnitina"],
+        training_recommendations: ["Non eccedere con supplementi proteici"],
+        foods_to_avoid: ["Eccesso proteine animali", "Supplementi BCAA"],
+        foods_to_prefer: ["Proteine vegetali variate", "Carboidrati adeguati"]
+      },
+      over_expressed: {
+        state: "over_expressed",
+        description: "Rapido catabolismo BCAA",
+        metabolic_consequences: ["Deplezione BCAA rapida", "Potenziale catabolismo muscolare"],
+        symptoms: ["Difficoltà costruire muscolo", "Fatica durante esercizio prolungato"],
+        nutritional_recommendations: ["Aumentare BCAA dietetici", "Proteine frequenti"],
+        supplement_recommendations: ["BCAA 5-10g peri-workout", "Leucina extra"],
+        training_recommendations: ["Nutrizione intra-workout", "BCAA durante allenamenti lunghi"],
+        foods_to_avoid: ["Digiuno prolungato pre-workout"],
+        foods_to_prefer: ["Latticini", "Carne", "Uova", "Legumi + cereali"]
+      }
+    },
+    related_genes: ["BCKDHA", "BCKDHB", "DBT"],
+    biomarkers: ["BCAA plasmatici", "Rapporto BCAA/aromatici"],
+    test_panels: ["Aminoacidogramma", "Panel muscolare"]
+  },
+
+  // TRASPORTO - MCT
+  {
+    id: "mct1",
+    symbol: "SLC16A1",
+    full_name: "Monocarboxylate Transporter 1",
+    chromosome: "1p13.2",
+    category: "transport",
+    pathway: ["trasporto_lattato", "shuttle_lattato", "metabolismo_chetoni"],
+    function: "Trasporta lattato, piruvato e corpi chetonici attraverso membrane cellulari. Cruciale per clearance lattato muscolare.",
+    expression_states: {
+      normal: {
+        state: "normal",
+        description: "Trasporto lattato efficiente",
+        metabolic_consequences: ["Clearance lattato rapida", "Utilizzo lattato come carburante efficiente"],
+        symptoms: [],
+        nutritional_recommendations: ["Dieta bilanciata"],
+        supplement_recommendations: [],
+        training_recommendations: ["HIIT migliora espressione MCT1"],
+        foods_to_avoid: [],
+        foods_to_prefer: []
+      },
+      under_expressed: {
+        state: "under_expressed",
+        description: "Ridotta clearance lattato - ACCUMULO",
+        metabolic_consequences: ["Lattato si accumula nel muscolo", "Acidosi precoce", "Ridotta capacità anaerobica"],
+        symptoms: ["Bruciore muscolare precoce", "Fatica rapida ad alta intensità", "Recupero lento tra intervalli"],
+        nutritional_recommendations: ["Beta-alanina", "Bicarbonato pre-gara"],
+        supplement_recommendations: ["Beta-alanina (4-6g/die)", "Bicarbonato sodio (0.3g/kg pre-gara)", "Carnosina"],
+        training_recommendations: ["Allenamento soglia progressivo", "Intervalli per stimolare MCT1", "Patience - adattamento lento"],
+        foods_to_avoid: [],
+        foods_to_prefer: ["Carne (carnosina)", "Beta-alanina naturale"]
+      },
+      over_expressed: {
+        state: "over_expressed",
+        description: "Clearance lattato ultra-rapida (adattamento allenamento)",
+        metabolic_consequences: ["Lattato rimosso rapidamente", "Utilizzo lattato come carburante", "Tipico atleti elite"],
+        symptoms: ["Ottima tolleranza lattato", "Recupero rapido tra intervalli"],
+        nutritional_recommendations: ["Mantenere allenamento che ha indotto adattamento"],
+        supplement_recommendations: [],
+        training_recommendations: ["Continuare HIIT", "Variare stimoli"],
+        foods_to_avoid: [],
+        foods_to_prefer: []
+      }
+    },
+    related_genes: ["MCT4", "LDH", "CD147"],
+    biomarkers: ["Clearance lattato", "Lattato post-esercizio"],
+    test_panels: ["Test lattato incrementale", "Test Wingate"]
+  },
+
+  {
+    id: "glut4",
+    symbol: "SLC2A4",
+    full_name: "Glucose Transporter Type 4",
+    chromosome: "17p13.1",
+    category: "transport",
+    pathway: ["uptake_glucosio", "sensibilità_insulinica", "metabolismo_muscolare"],
+    function: "Trasportatore glucosio insulino-dipendente. Principale via di uptake glucosio in muscolo e tessuto adiposo.",
+    expression_states: {
+      normal: {
+        state: "normal",
+        description: "Uptake glucosio efficiente, buona sensibilità insulinica",
+        metabolic_consequences: ["Glicemia stabile", "Rifornimento glicogeno efficiente"],
+        symptoms: [],
+        nutritional_recommendations: ["Carboidrati intorno allenamento"],
+        supplement_recommendations: [],
+        training_recommendations: ["Esercizio regolare mantiene GLUT4"],
+        foods_to_avoid: [],
+        foods_to_prefer: []
+      },
+      under_expressed: {
+        state: "under_expressed",
+        description: "Ridotto uptake glucosio - INSULINO-RESISTENZA",
+        metabolic_consequences: ["Iperglicemia", "Iperinsulinemia compensatoria", "Ridotto rifornimento glicogeno", "Pre-diabete"],
+        symptoms: ["Affaticamento post-prandiale", "Fame frequente", "Difficoltà recupero glicogeno"],
+        nutritional_recommendations: ["Low-carb o timing carboidrati", "Fibre elevate", "Aceto prima pasti"],
+        supplement_recommendations: ["Berberina", "Acido alfa-lipoico", "Cromo", "Cannella", "Inositolo"],
+        training_recommendations: ["Esercizio regolare (upregula GLUT4)", "HIIT", "Resistance training"],
+        foods_to_avoid: ["Zuccheri semplici", "Carboidrati raffinati", "Eccesso calorico"],
+        foods_to_prefer: ["Verdure", "Legumi", "Proteine", "Grassi sani", "Aceto di mele"]
+      },
+      over_expressed: {
+        state: "over_expressed",
+        description: "Uptake glucosio aumentato (adattamento positivo)",
+        metabolic_consequences: ["Eccellente rifornimento glicogeno", "Alta sensibilità insulinica"],
+        symptoms: ["Potenziale ipoglicemia reattiva se eccesso carboidrati rapidi"],
+        nutritional_recommendations: ["Carboidrati complessi", "Evitare zuccheri semplici isolati"],
+        supplement_recommendations: [],
+        training_recommendations: ["Continuare attività che ha indotto adattamento"],
+        foods_to_avoid: ["Zuccheri semplici senza proteine/grassi"],
+        foods_to_prefer: ["Carboidrati complessi", "Combinazioni equilibrate"]
+      }
+    },
+    related_genes: ["IRS1", "AKT", "AS160", "AMPK"],
+    biomarkers: ["Glicemia digiuno", "Insulina digiuno", "HOMA-IR", "HbA1c"],
+    test_panels: ["Panel metabolico", "OGTT", "Clamp euglicemico"]
+  },
+
+  // DETOX
+  {
+    id: "cyp1a2",
+    symbol: "CYP1A2",
+    full_name: "Cytochrome P450 1A2",
+    chromosome: "15q24.1",
+    category: "amino_acid",
+    pathway: ["metabolismo_caffeina", "detossificazione_fase1", "metabolismo_farmaci"],
+    function: "Enzima chiave per metabolismo caffeina. Responsabile di oltre 90% della clearance caffeina. Anche metabolizza farmaci e tossine.",
+    expression_states: {
+      normal: {
+        state: "normal",
+        description: "Metabolismo caffeina nella norma (metabolizzatore intermedio)",
+        metabolic_consequences: ["Emivita caffeina ~5 ore", "Risposta normale a caffè"],
+        symptoms: [],
+        nutritional_recommendations: ["Caffeina moderata OK", "Evitare tardi nella giornata"],
+        supplement_recommendations: ["Caffeina 3-6mg/kg pre-performance"],
+        training_recommendations: ["Caffeina utile per performance"],
+        foods_to_avoid: ["Caffeina dopo le 14-15 per sonno"],
+        foods_to_prefer: []
+      },
+      under_expressed: {
+        state: "under_expressed",
+        description: "Metabolizzatore lento caffeina - ATTENZIONE",
+        metabolic_consequences: ["Emivita caffeina prolungata (>10 ore)", "Accumulo con dosi ripetute", "Aumentato rischio CV con caffè"],
+        symptoms: ["Insonnia anche con caffè mattutino", "Ansia da caffeina", "Palpitazioni", "Ipertensione"],
+        nutritional_recommendations: ["Limitare caffeina drasticamente", "Solo mattino presto se necessario", "Max 100mg/die"],
+        supplement_recommendations: ["Evitare supplementi con caffeina", "Usare alternative (taurina, tirosina)"],
+        training_recommendations: ["Caffeina NON ergogenica per slow metabolizers - evitare", "Alternative: beetroot juice, citrullina"],
+        foods_to_avoid: ["Caffè", "Tè nero/verde eccessivo", "Energy drink", "Pre-workout con caffeina"],
+        foods_to_prefer: ["Tisane senza caffeina", "Cacao (teobromina diversa)"]
+      },
+      over_expressed: {
+        state: "over_expressed",
+        description: "Metabolizzatore rapido caffeina - VANTAGGIO",
+        metabolic_consequences: ["Emivita caffeina ~2-3 ore", "Clearance rapida", "Beneficio cardiovascolare da caffè"],
+        symptoms: ["Necessità di più caffeina per effetto", "Tolleranza rapida"],
+        nutritional_recommendations: ["Può tollerare più caffeina", "Anche nel pomeriggio possibile"],
+        supplement_recommendations: ["Caffeina 6mg/kg pre-gara efficace", "Può ripetere dosi"],
+        training_recommendations: ["Caffeina molto ergogenica", "Timing flessibile"],
+        foods_to_avoid: [],
+        foods_to_prefer: ["Caffè anche per benefici salute"]
+      },
+      polymorphism: {
+        state: "polymorphism",
+        description: "Variante rs762551 - determina velocità metabolismo",
+        metabolic_consequences: ["AA = fast, AC/CC = slow"],
+        symptoms: ["Variabili in base a genotipo"],
+        nutritional_recommendations: ["Test genetico per determinare", "Osservare risposta personale"],
+        supplement_recommendations: ["Personalizzare in base a genotipo"],
+        training_recommendations: ["Trial individuale"],
+        foods_to_avoid: [],
+        foods_to_prefer: []
+      }
+    },
+    related_genes: ["CYP2D6", "CYP3A4", "NAT2", "ADORA2A"],
+    biomarkers: ["Caffeina plasmatica", "Paraxantina"],
+    test_panels: ["Test genetico caffeina", "Farmacogenomica"]
+  },
+
+  {
+    id: "gstm1",
+    symbol: "GSTM1",
+    full_name: "Glutathione S-Transferase Mu 1",
+    chromosome: "1p13.3",
+    category: "antioxidant",
+    pathway: ["detossificazione_fase2", "coniugazione_glutatione", "eliminazione_xenobiotici"],
+    function: "Coniuga glutatione a sostanze tossiche per renderle idrosolubili ed eliminabili. Detossifica carcinogeni, pesticidi, metalli.",
+    expression_states: {
+      normal: {
+        state: "normal",
+        description: "Detossificazione fase 2 efficiente",
+        metabolic_consequences: ["Eliminazione tossine efficace", "Protezione da carcinogeni"],
+        symptoms: [],
+        nutritional_recommendations: ["Crucifere regolari", "Antiossidanti"],
+        supplement_recommendations: [],
+        training_recommendations: ["Standard"],
+        foods_to_avoid: [],
+        foods_to_prefer: []
+      },
+      under_expressed: {
+        state: "under_expressed",
+        description: "Detossificazione compromessa - variante null (50% popolazione)",
+        metabolic_consequences: ["Ridotta coniugazione tossine", "Accumulo xenobiotici", "Maggior rischio cancro", "Sensibilità chimica"],
+        symptoms: ["Intolleranza chimica", "Sensibilità a profumi/solventi", "Fatica da esposizioni", "Mal di testa frequenti"],
+        nutritional_recommendations: ["Crucifere quotidiane (sulforafano)", "Dieta biologica", "Evitare pesticidi", "NAC"],
+        supplement_recommendations: ["NAC (600-1200mg)", "Sulforafano", "Glutatione liposomiale", "Cardo mariano", "Selenio"],
+        training_recommendations: ["Evitare allenamento in aree inquinate", "Sauna per sudorazione detox"],
+        foods_to_avoid: ["Cibi non biologici", "Carni alla griglia bruciate", "Alimenti affumicati", "Alcol"],
+        foods_to_prefer: ["Broccoli", "Cavoli", "Aglio", "Cipolla", "Curcuma", "Cibo biologico"]
+      },
+      over_expressed: {
+        state: "over_expressed",
+        description: "Detossificazione iperattiva (raro)",
+        metabolic_consequences: ["Possibile interferenza con alcuni farmaci"],
+        symptoms: [],
+        nutritional_recommendations: ["Attenzione a interazioni farmaci"],
+        supplement_recommendations: [],
+        training_recommendations: ["Standard"],
+        foods_to_avoid: [],
+        foods_to_prefer: []
+      }
+    },
+    related_genes: ["GSTT1", "GSTP1", "GCLC", "NRF2"],
+    biomarkers: ["Glutatione", "Addotti DNA", "Metaboliti urinari"],
+    test_panels: ["Panel detox genetico", "Metaboliti tossine"]
   }
 ]
 
@@ -1317,7 +1936,10 @@ export const GENE_CATEGORY_LABELS: Record<string, string> = {
   antioxidant: "Difesa Antiossidante",
   amino_acid: "Metabolismo Aminoacidi",
   methylation: "Metilazione",
-  inflammation: "Infiammazione"
+  inflammation: "Infiammazione",
+  detox: "Detossificazione",
+  hormones: "Metabolismo Ormonale",
+  longevity: "Longevità/Aging"
 }
 
 export const GENE_CATEGORY_COLORS: Record<string, string> = {
@@ -1329,5 +1951,8 @@ export const GENE_CATEGORY_COLORS: Record<string, string> = {
   antioxidant: "green",
   amino_acid: "yellow",
   methylation: "pink",
-  inflammation: "rose"
+  inflammation: "rose",
+  detox: "emerald",
+  hormones: "indigo",
+  longevity: "amber"
 }
