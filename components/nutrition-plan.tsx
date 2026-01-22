@@ -177,6 +177,43 @@ const BRAND_PRODUCTS: Record<string, Record<string, { name: string; dose: string
     eaa: [{ name: "EAA", dose: "10g", note: "Tutti gli essenziali" }],
     "beta-alanina": [{ name: "Beta Alanine", dose: "3-6g/die", note: "Powder o tabs" }],
   },
+  // New brands added to match expanded database
+  "Precision Hydration": {
+    gel: [{ name: "PF 30 Gel", dose: "1 gel (30g CHO)", note: "1:1 ratio mild" }],
+    elettroliti: [{ name: "PH 1000", dose: "1 tab/500ml", note: "1000mg sodio" }],
+  },
+  HIGH5: {
+    gel: [{ name: "Energy Gel Aqua", dose: "1 gel (23g CHO)", note: "Isotonico, no acqua" }],
+    maltodestrine: [{ name: "Energy Drink", dose: "40-80g/h", note: "Mix economico" }],
+    recovery: [{ name: "Recovery Drink 4:1", dose: "60g", note: "15g proteine" }],
+    elettroliti: [{ name: "Zero", dose: "1 tab/500ml", note: "Zero calorie" }],
+    barrette: [{ name: "Energy Bar", dose: "1 bar (40g CHO)", note: "Avena naturale" }],
+  },
+  Nduranz: {
+    gel: [{ name: "Nrgy Unit Gel", dose: "1 gel (22g CHO)", note: "Natural ingredients" }],
+    maltodestrine: [{ name: "Nrgy Unit Drink 90", dose: "90g/h", note: "1:1 ratio high CHO" }],
+    barrette: [{ name: "Nrgy Unit Bar", dose: "1 bar (36g CHO)", note: "Datteri naturali" }],
+  },
+  TORQ: {
+    gel: [{ name: "TORQ Gel", dose: "1 gel (28g CHO)", note: "2:1 maltodex:fruct" }],
+    maltodestrine: [{ name: "TORQ Energy", dose: "40-80g/h", note: "Biologico" }],
+    recovery: [{ name: "TORQ Recovery", dose: "65g", note: "20g whey protein" }],
+    barrette: [{ name: "TORQ Bar", dose: "1 bar (32g CHO)", note: "Organic" }],
+  },
+  "Hammer Nutrition": {
+    gel: [{ name: "Hammer Gel", dose: "1 gel (21g CHO)", note: "Basso zucchero" }],
+    maltodestrine: [{ name: "HEED", dose: "25-50g/h", note: "No zucchero, stevia" }],
+    recovery: [{ name: "Recoverite", dose: "57g", note: "Whey isolate + glutamina" }],
+  },
+  Tailwind: {
+    maltodestrine: [{ name: "Endurance Fuel", dose: "50-100g/h", note: "All-in-one semplice" }],
+    recovery: [{ name: "Rebuild Recovery", dose: "62g", note: "Rice protein" }],
+    caffeina: [{ name: "Caffeinated Fuel", dose: "35mg/porzione", note: "Per ultra" }],
+  },
+  "Skratch Labs": {
+    maltodestrine: [{ name: "Sport Hydration", dose: "20-40g/h", note: "Real fruit, natural" }],
+    elettroliti: [{ name: "Superfuel", dose: "100g/h", note: "Cluster dextrin race" }],
+  },
 }
 
 // Default GE value
@@ -1724,7 +1761,7 @@ function NutritionPlan({ athleteData, userName }: NutritionPlanProps) {
 
         const { data: constraintsData, error: constraintsError } = await supabase
           .from("athlete_constraints")
-          .select("intolerances, allergies, dietary_preferences, dietary_limits")
+          .select("intolerances, allergies, dietary_preferences, dietary_limits, notes")
           .eq("athlete_id", athleteId)
           .single()
 
@@ -1797,6 +1834,21 @@ if (annualPlan?.config_json?.training_preferences) {
       brands: supps.brands || [],
       types: supps.types || [],
     })
+    console.log("[v0] Loaded sport supplements from annual_plan:", supps)
+  } else if (constraintsData?.notes) {
+    // Fallback: load from athlete_constraints.notes
+    try {
+      const parsedNotes = JSON.parse(constraintsData.notes)
+      if (parsedNotes.sport_supplements) {
+        setSportSupplements({
+          brands: parsedNotes.sport_supplements.brands || [],
+          types: parsedNotes.sport_supplements.types || [],
+        })
+        console.log("[v0] Loaded sport supplements from athlete_constraints.notes:", parsedNotes.sport_supplements)
+      }
+    } catch (e) {
+      console.log("[v0] Error parsing sport supplements from notes:", e)
+    }
   }
   
   // Load AI adaptations from config_json
