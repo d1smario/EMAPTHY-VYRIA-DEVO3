@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import { OnboardingWizard } from "@/components/onboarding-wizard"
+import { OnboardingWizardCoach } from "@/components/onboarding-wizard-coach"
 
 export default async function OnboardingPage() {
   const supabase = await createClient()
@@ -32,6 +33,15 @@ export default async function OnboardingPage() {
 
   if (profile?.onboarding_completed) {
     redirect("/dashboard")
+  }
+
+  // Determine role from profile or user metadata
+  const role = profile?.role || user.user_metadata?.role || 'athlete'
+  console.log("[v0] Onboarding for role:", role)
+
+  // Show different wizard based on role
+  if (role === 'coach') {
+    return <OnboardingWizardCoach user={user} initialProfile={profile} />
   }
 
   return <OnboardingWizard user={user} initialProfile={profile} />
