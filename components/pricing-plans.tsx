@@ -307,3 +307,4 @@ export default function PricingPlans({ currentTier = 'free', onSelectPlan }: Pri
     </div>
   )
 }
+
