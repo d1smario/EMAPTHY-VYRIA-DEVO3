@@ -30,7 +30,44 @@ export default async function DashboardPage() {
     } else {
       user = userData.user
 
-      const { data: profileData } = await supabase!.from("users").select("*").eq("id", user.id).maybeSingle()
+      let { data: profileData, error: profileError } = await supabase!.from("users").select("*").eq("id", user.id).maybeSingle()
+      
+      console.log("[v0] Profile loaded:", profileData?.role, "Error:", profileError?.message)
+      
+      // Get role from auth metadata
+      const metadataRole = user.user_metadata?.role || 'athlete'
+      console.log("[v0] Metadata role:", metadataRole)
+      
+      // If no profile exists, create it with correct role
+      if (!profileData && !profileError) {
+        console.log("[v0] No profile found, creating with role:", metadataRole)
+        const { data: newProfile, error: insertError } = await supabase!.from("users").insert({
+          id: user.id,
+          email: user.email!,
+          full_name: user.user_metadata?.full_name || '',
+          role: metadataRole,
+          onboarding_completed: false
+        }).select().single()
+        
+        if (insertError) {
+          console.log("[v0] Error creating profile:", insertError.message)
+        } else {
+          profileData = newProfile
+          console.log("[v0] Profile created with role:", newProfile?.role)
+        }
+      }
+      // If role is wrong in users table, update it
+      else if (profileData && metadataRole && profileData.role !== metadataRole) {
+        console.log("[v0] Role mismatch - DB:", profileData.role, "Metadata:", metadataRole, "- Updating...")
+        const { error: updateError } = await supabase!.from("users").update({ role: metadataRole }).eq("id", user.id)
+        if (updateError) {
+          console.log("[v0] Error updating role:", updateError.message)
+        } else {
+          profileData.role = metadataRole
+          console.log("[v0] Role updated successfully to:", metadataRole)
+        }
+      }
+      
       profile = profileData
 
       if (!profile?.onboarding_completed) {
