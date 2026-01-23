@@ -7,407 +7,488 @@ import { Badge } from "@/components/ui/badge"
 import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Link2, Check, X, RefreshCw, Upload, AlertCircle, Clock } from "lucide-react"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { 
+  Link2, 
+  Check, 
+  X, 
+  RefreshCw, 
+  Upload, 
+  AlertCircle, 
+  Clock,
+  Activity,
+  Moon,
+  Heart,
+  Dumbbell,
+  ExternalLink
+} from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
+import type { RookProvider } from "@/lib/rook/types"
 
 interface DeviceIntegrationsProps {
-  athleteId: string | undefined
+  athleteId?: string
+  userId?: string
 }
 
-interface DeviceProvider {
-  id: string
+interface ProviderStatus {
+  provider: RookProvider
   name: string
+  logo: string
+  category: 'wearable' | 'app' | 'platform' | 'cgm'
+  dataTypes: string[]
+  requiresMobile: boolean
   description: string
-  icon: string
-  color: string
-  features: string[]
-  authType: "oauth" | "api_key" | "manual"
-  status: "connected" | "disconnected" | "pending"
-  lastSync?: string
+  isConnected: boolean
+  connectionId?: string
+  connectedAt?: string
+  lastSyncAt?: string
+  syncStatus: string
+  syncError?: string
 }
 
-const DEVICE_PROVIDERS: DeviceProvider[] = [
-  {
-    id: "garmin",
-    name: "Garmin Connect",
-    description: "Sync activities, health metrics, and wearable data",
-    icon: "⌚",
-    color: "#007CC3",
-    features: ["Activities", "HR", "HRV", "Sleep", "Body Battery"],
-    authType: "oauth",
-    status: "disconnected",
-  },
-  {
-    id: "strava",
-    name: "Strava",
-    description: "Import rides, runs, and activities",
-    icon: "🏃",
-    color: "#FC4C02",
-    features: ["Activities", "Segments", "Routes"],
-    authType: "oauth",
-    status: "disconnected",
-  },
-  {
-    id: "whoop",
-    name: "WHOOP",
-    description: "Recovery, strain, and sleep data",
-    icon: "💪",
-    color: "#00B388",
-    features: ["Recovery", "Strain", "Sleep", "HRV"],
-    authType: "oauth",
-    status: "disconnected",
-  },
-  {
-    id: "core",
-    name: "CORE Body Temperature",
-    description: "Real-time core temperature monitoring",
-    icon: "🌡️",
-    color: "#FF6B35",
-    features: ["Core Temp", "Skin Temp", "Heat Strain"],
-    authType: "api_key",
-    status: "disconnected",
-  },
-  {
-    id: "moxy",
-    name: "Moxy Monitor",
-    description: "Muscle oxygen saturation (SmO2) data",
-    icon: "🩸",
-    color: "#E63946",
-    features: ["SmO2", "THb", "Muscle O2"],
-    authType: "manual",
-    status: "disconnected",
-  },
-  {
-    id: "abbott",
-    name: "Abbott Libre",
-    description: "Continuous glucose monitoring data",
-    icon: "📊",
-    color: "#00A3E0",
-    features: ["Glucose", "Time in Range", "Trends"],
-    authType: "api_key",
-    status: "disconnected",
-  },
-  {
-    id: "trainingpeaks",
-    name: "TrainingPeaks",
-    description: "Workouts, plans, and performance data",
-    icon: "📈",
-    color: "#1A1A1A",
-    features: ["Workouts", "TSS", "CTL/ATL"],
-    authType: "oauth",
-    status: "disconnected",
-  },
-  {
-    id: "intervals",
-    name: "Intervals.icu",
-    description: "Advanced analytics and planning",
-    icon: "📉",
-    color: "#6366F1",
-    features: ["Activities", "Fitness", "Icu TSS"],
-    authType: "api_key",
-    status: "disconnected",
-  },
-]
+// Provider icons/emojis as fallback
+const PROVIDER_ICONS: Record<string, string> = {
+  garmin: "⌚",
+  polar: "❤️",
+  whoop: "💪",
+  oura: "💍",
+  strava: "🏃",
+  fitbit: "📱",
+  suunto: "🏔️",
+  coros: "⏱️",
+  withings: "⚖️",
+  trainingpeaks: "📈",
+  wahoo: "🚴",
+  zwift: "🎮",
+  peloton: "🚲",
+  eight_sleep: "🛏️",
+  apple_health: "🍎",
+  health_connect: "🤖",
+  dexcom: "📊",
+  freestyle_libre: "💉",
+}
 
-export function DeviceIntegrations({ athleteId }: DeviceIntegrationsProps) {
-  const [providers, setProviders] = useState<DeviceProvider[]>(DEVICE_PROVIDERS)
-  const [loading, setLoading] = useState<string | null>(null)
-  const [connections, setConnections] = useState<any[]>([])
-  const [showApiKeyModal, setShowApiKeyModal] = useState<string | null>(null)
-  const [apiKey, setApiKey] = useState("")
+// Provider colors
+const PROVIDER_COLORS: Record<string, string> = {
+  garmin: "#007CC3",
+  polar: "#D32F2F",
+  whoop: "#00B388",
+  oura: "#7C3AED",
+  strava: "#FC4C02",
+  fitbit: "#00B0B9",
+  suunto: "#1A1A1A",
+  coros: "#0066CC",
+  withings: "#00A19B",
+  trainingpeaks: "#1A1A1A",
+  wahoo: "#0066FF",
+  zwift: "#FF6B00",
+  peloton: "#FF0033",
+  eight_sleep: "#1A1A1A",
+  apple_health: "#FF2D55",
+  health_connect: "#4285F4",
+  dexcom: "#00A3E0",
+  freestyle_libre: "#0072CE",
+}
 
+export function DeviceIntegrations({ athleteId, userId }: DeviceIntegrationsProps) {
+  const [providers, setProviders] = useState<ProviderStatus[]>([])
+  const [loading, setLoading] = useState(true)
+  const [actionLoading, setActionLoading] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [activeTab, setActiveTab] = useState<'all' | 'wearable' | 'app' | 'platform' | 'cgm'>('all')
+
+  // Load provider status on mount
   useEffect(() => {
-    if (athleteId) {
-      loadConnections()
-    }
-  }, [athleteId])
+    loadProviderStatus()
+  }, [])
 
-  const loadConnections = async () => {
-    const supabase = createClient()
-
+  const loadProviderStatus = async () => {
+    setLoading(true)
+    setError(null)
+    
     try {
-      const { data } = await supabase.from("device_connections").select("*").eq("user_id", athleteId)
-
-      if (data) {
-        setConnections(data)
-
-        setProviders((prev) =>
-          prev.map((p) => {
-            const connection = data.find((c) => c.provider === p.id)
-            return {
-              ...p,
-              status: connection?.is_active ? "connected" : "disconnected",
-              lastSync: connection?.last_sync_at,
-            }
-          }),
-        )
+      const supabase = createClient()
+      const { data: { session } } = await supabase.auth.getSession()
+      
+      if (!session?.access_token) {
+        setError("Devi essere autenticato per vedere le integrazioni")
+        setLoading(false)
+        return
       }
-    } catch (error) {
-      console.error("Error loading connections:", error)
+
+      const response = await fetch('/api/rook/status', {
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`
+        }
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to load provider status')
+      }
+
+      const data = await response.json()
+      setProviders(data.connections || [])
+    } catch (err) {
+      console.error('Error loading providers:', err)
+      setError("Errore nel caricamento delle integrazioni")
+    } finally {
+      setLoading(false)
     }
   }
 
-  const handleConnect = async (provider: DeviceProvider) => {
-    setLoading(provider.id)
-
-    if (provider.authType === "oauth") {
-      setTimeout(() => {
-        alert(
-          `OAuth flow for ${provider.name} would open here.\nThis requires backend API routes to handle the OAuth callback.`,
-        )
-        setLoading(null)
-      }, 1000)
-    } else if (provider.authType === "api_key") {
-      setShowApiKeyModal(provider.id)
-      setLoading(null)
-    } else {
-      alert(`${provider.name} requires manual file upload.\nSupported formats: FIT, TCX, GPX`)
-      setLoading(null)
+  const handleConnect = async (provider: ProviderStatus) => {
+    if (provider.requiresMobile) {
+      alert(`${provider.name} richiede l'app mobile ROOK per la connessione. Scarica l'app e collega il tuo account.`)
+      return
     }
-  }
 
-  const handleSaveApiKey = async (providerId: string) => {
-    if (!apiKey.trim()) return
-
-    setLoading(providerId)
-    const supabase = createClient()
+    setActionLoading(provider.provider)
+    setError(null)
 
     try {
-      const { error } = await supabase.from("device_connections").upsert(
-        {
-          user_id: athleteId,
-          provider: providerId,
-          access_token: apiKey,
-          is_active: true,
-          last_sync_at: new Date().toISOString(),
-        },
-        {
-          onConflict: "user_id,provider",
-        },
-      )
+      const supabase = createClient()
+      const { data: { session } } = await supabase.auth.getSession()
+      
+      if (!session?.access_token) {
+        throw new Error('Not authenticated')
+      }
 
-      if (error) throw error
+      const response = await fetch(`/api/rook/authorize?provider=${provider.provider}`, {
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`
+        }
+      })
 
-      setProviders((prev) =>
-        prev.map((p) => (p.id === providerId ? { ...p, status: "connected", lastSync: new Date().toISOString() } : p)),
-      )
-      setShowApiKeyModal(null)
-      setApiKey("")
-    } catch (error) {
-      console.error("Error saving API key:", error)
-      alert("Error saving API key. Please try again.")
+      if (!response.ok) {
+        throw new Error('Failed to get authorization URL')
+      }
+
+      const data = await response.json()
+      
+      // Redirect to provider OAuth
+      if (data.authorization_url) {
+        window.location.href = data.authorization_url
+      }
+    } catch (err) {
+      console.error('Error connecting:', err)
+      setError(`Errore nella connessione a ${provider.name}`)
     } finally {
-      setLoading(null)
+      setActionLoading(null)
     }
   }
 
-  const handleDisconnect = async (providerId: string) => {
-    setLoading(providerId)
-    const supabase = createClient()
+  const handleDisconnect = async (provider: ProviderStatus) => {
+    if (!confirm(`Sei sicuro di voler disconnettere ${provider.name}?`)) {
+      return
+    }
+
+    setActionLoading(provider.provider)
+    setError(null)
 
     try {
-      const { error } = await supabase
-        .from("device_connections")
-        .update({ is_active: false })
-        .eq("user_id", athleteId)
-        .eq("provider", providerId)
+      const supabase = createClient()
+      const { data: { session } } = await supabase.auth.getSession()
+      
+      if (!session?.access_token) {
+        throw new Error('Not authenticated')
+      }
 
-      if (error) throw error
+      const response = await fetch('/api/rook/revoke', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ provider: provider.provider })
+      })
 
-      setProviders((prev) => prev.map((p) => (p.id === providerId ? { ...p, status: "disconnected" } : p)))
-    } catch (error) {
-      console.error("Error disconnecting:", error)
+      if (!response.ok) {
+        throw new Error('Failed to disconnect')
+      }
+
+      // Refresh status
+      await loadProviderStatus()
+    } catch (err) {
+      console.error('Error disconnecting:', err)
+      setError(`Errore nella disconnessione da ${provider.name}`)
     } finally {
-      setLoading(null)
+      setActionLoading(null)
     }
   }
 
-  const handleSync = async (providerId: string) => {
-    setLoading(providerId)
+  const handleRefreshStatus = async () => {
+    setActionLoading('refresh')
+    
+    try {
+      const supabase = createClient()
+      const { data: { session } } = await supabase.auth.getSession()
+      
+      if (!session?.access_token) {
+        throw new Error('Not authenticated')
+      }
 
-    setTimeout(() => {
-      setProviders((prev) => prev.map((p) => (p.id === providerId ? { ...p, lastSync: new Date().toISOString() } : p)))
-      setLoading(null)
-    }, 2000)
+      await fetch('/api/rook/status', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`
+        }
+      })
+
+      await loadProviderStatus()
+    } catch (err) {
+      console.error('Error refreshing:', err)
+    } finally {
+      setActionLoading(null)
+    }
   }
 
-  const connectedCount = providers.filter((p) => p.status === "connected").length
+  const filteredProviders = activeTab === 'all' 
+    ? providers 
+    : providers.filter(p => p.category === activeTab)
+
+  const connectedCount = providers.filter(p => p.isConnected).length
+  const wearableCount = providers.filter(p => p.category === 'wearable').length
+  const appCount = providers.filter(p => p.category === 'app').length
+  const platformCount = providers.filter(p => p.category === 'platform').length
+
+  const getCategoryIcon = (category: string) => {
+    switch (category) {
+      case 'wearable': return <Activity className="h-4 w-4" />
+      case 'app': return <Heart className="h-4 w-4" />
+      case 'platform': return <Dumbbell className="h-4 w-4" />
+      case 'cgm': return <Moon className="h-4 w-4" />
+      default: return <Activity className="h-4 w-4" />
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <RefreshCw className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h3 className="text-lg font-semibold">Device Integrations</h3>
-          <p className="text-sm text-muted-foreground">Connect your devices and platforms to sync training data</p>
+          <h3 className="text-lg font-semibold">Integrazioni Dispositivi</h3>
+          <p className="text-sm text-muted-foreground">
+            Collega i tuoi dispositivi e piattaforme per sincronizzare automaticamente i dati
+          </p>
         </div>
-        <Badge variant="outline">
-          {connectedCount} of {providers.length} connected
-        </Badge>
+        <div className="flex items-center gap-2">
+          <Badge variant="outline" className="text-sm">
+            {connectedCount} / {providers.length} connessi
+          </Badge>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={handleRefreshStatus}
+            disabled={actionLoading === 'refresh'}
+            className="bg-transparent"
+          >
+            <RefreshCw className={`h-4 w-4 ${actionLoading === 'refresh' ? 'animate-spin' : ''}`} />
+          </Button>
+        </div>
       </div>
 
+      {error && (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
+
+      {/* Info Alert */}
       <Alert>
         <AlertCircle className="h-4 w-4" />
         <AlertDescription>
-          Connect your devices to automatically import activities, health metrics, and sensor data. All data is securely
-          stored and only accessible to you.
+          Connetti i tuoi dispositivi per importare automaticamente attivita, metriche di salute e dati dei sensori. 
+          Tutti i dati sono archiviati in modo sicuro e accessibili solo a te tramite TryRook.io.
         </AlertDescription>
       </Alert>
 
-      <div className="grid gap-4 md:grid-cols-2">
-        {providers.map((provider) => (
-          <Card key={provider.id} className={provider.status === "connected" ? "border-green-500/50" : ""}>
-            <CardHeader className="pb-3">
-              <div className="flex items-start justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="text-2xl p-2 rounded-lg" style={{ backgroundColor: `${provider.color}20` }}>
-                    {provider.icon}
-                  </div>
-                  <div>
-                    <CardTitle className="text-base flex items-center gap-2">
-                      {provider.name}
-                      {provider.status === "connected" && (
-                        <Badge variant="default" className="bg-green-500 text-xs">
-                          Connected
-                        </Badge>
-                      )}
-                    </CardTitle>
-                    <CardDescription className="text-xs mt-1">{provider.description}</CardDescription>
-                  </div>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex flex-wrap gap-1">
-                {provider.features.map((feature, i) => (
-                  <Badge key={i} variant="secondary" className="text-xs">
-                    {feature}
-                  </Badge>
-                ))}
-              </div>
+      {/* Category Tabs */}
+      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as typeof activeTab)}>
+        <TabsList className="grid grid-cols-5 w-full">
+          <TabsTrigger value="all">
+            Tutti ({providers.length})
+          </TabsTrigger>
+          <TabsTrigger value="wearable">
+            Wearable ({wearableCount})
+          </TabsTrigger>
+          <TabsTrigger value="app">
+            App ({appCount})
+          </TabsTrigger>
+          <TabsTrigger value="platform">
+            Platform ({platformCount})
+          </TabsTrigger>
+          <TabsTrigger value="cgm">
+            CGM
+          </TabsTrigger>
+        </TabsList>
 
-              {provider.status === "connected" && provider.lastSync && (
-                <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                  <Clock className="h-3 w-3" />
-                  Last sync: {new Date(provider.lastSync).toLocaleString("it-IT")}
-                </div>
-              )}
-
-              <div className="flex gap-2">
-                {provider.status === "connected" ? (
-                  <>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="flex-1 bg-transparent"
-                      onClick={() => handleSync(provider.id)}
-                      disabled={loading === provider.id}
-                    >
-                      {loading === provider.id ? (
-                        <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                      ) : (
-                        <RefreshCw className="h-4 w-4 mr-2" />
-                      )}
-                      Sync Now
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleDisconnect(provider.id)}
-                      disabled={loading === provider.id}
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
-                  </>
-                ) : (
-                  <Button
-                    variant="default"
-                    size="sm"
-                    className="flex-1"
-                    onClick={() => handleConnect(provider)}
-                    disabled={loading === provider.id}
-                  >
-                    {loading === provider.id ? (
-                      <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                    ) : (
-                      <Link2 className="h-4 w-4 mr-2" />
-                    )}
-                    Connect
-                  </Button>
+        <TabsContent value={activeTab} className="mt-4">
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {filteredProviders.map((provider) => (
+              <Card 
+                key={provider.provider} 
+                className={`relative overflow-hidden ${
+                  provider.isConnected 
+                    ? 'border-green-500/50 bg-green-500/5' 
+                    : ''
+                }`}
+              >
+                {/* Status indicator */}
+                {provider.isConnected && (
+                  <div className="absolute top-0 right-0 w-16 h-16 overflow-hidden">
+                    <div className="absolute top-2 right-[-20px] w-[80px] text-center text-xs font-semibold py-1 bg-green-500 text-white transform rotate-45">
+                      Online
+                    </div>
+                  </div>
                 )}
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
 
+                <CardHeader className="pb-3">
+                  <div className="flex items-start gap-3">
+                    <div 
+                      className="text-2xl p-2 rounded-lg" 
+                      style={{ backgroundColor: `${PROVIDER_COLORS[provider.provider] || '#666'}20` }}
+                    >
+                      {PROVIDER_ICONS[provider.provider] || '📱'}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <CardTitle className="text-base flex items-center gap-2">
+                        {provider.name}
+                        {provider.requiresMobile && (
+                          <Badge variant="secondary" className="text-xs">
+                            Mobile
+                          </Badge>
+                        )}
+                      </CardTitle>
+                      <CardDescription className="text-xs mt-1 line-clamp-2">
+                        {provider.description}
+                      </CardDescription>
+                    </div>
+                  </div>
+                </CardHeader>
+
+                <CardContent className="space-y-4">
+                  {/* Data types */}
+                  <div className="flex flex-wrap gap-1">
+                    {provider.dataTypes.slice(0, 4).map((type, i) => (
+                      <Badge key={i} variant="secondary" className="text-xs">
+                        {type.replace(/_/g, ' ').replace('summary', '').replace('event', '').trim()}
+                      </Badge>
+                    ))}
+                    {provider.dataTypes.length > 4 && (
+                      <Badge variant="secondary" className="text-xs">
+                        +{provider.dataTypes.length - 4}
+                      </Badge>
+                    )}
+                  </div>
+
+                  {/* Connection info */}
+                  {provider.isConnected && (
+                    <div className="space-y-1">
+                      {provider.lastSyncAt && (
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                          <Clock className="h-3 w-3" />
+                          Ultimo sync: {new Date(provider.lastSyncAt).toLocaleString('it-IT')}
+                        </div>
+                      )}
+                      {provider.syncError && (
+                        <div className="flex items-center gap-2 text-xs text-red-500">
+                          <AlertCircle className="h-3 w-3" />
+                          {provider.syncError}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Actions */}
+                  <div className="flex gap-2">
+                    {provider.isConnected ? (
+                      <>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="flex-1 bg-transparent"
+                          onClick={() => handleDisconnect(provider)}
+                          disabled={actionLoading === provider.provider}
+                        >
+                          {actionLoading === provider.provider ? (
+                            <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                          ) : (
+                            <X className="h-4 w-4 mr-2" />
+                          )}
+                          Disconnetti
+                        </Button>
+                      </>
+                    ) : (
+                      <Button
+                        variant="default"
+                        size="sm"
+                        className="flex-1"
+                        onClick={() => handleConnect(provider)}
+                        disabled={actionLoading === provider.provider}
+                      >
+                        {actionLoading === provider.provider ? (
+                          <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                        ) : (
+                          <Link2 className="h-4 w-4 mr-2" />
+                        )}
+                        {provider.requiresMobile ? 'Setup Mobile' : 'Connetti'}
+                      </Button>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </TabsContent>
+      </Tabs>
+
+      {/* Manual Upload Section */}
       <Card>
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2">
             <Upload className="h-5 w-5" />
-            Manual Upload
+            Upload Manuale
           </CardTitle>
-          <CardDescription>Upload activity files directly from your computer</CardDescription>
+          <CardDescription>
+            Carica file di attivita direttamente dal tuo computer
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="border-2 border-dashed border-muted rounded-lg p-8 text-center">
             <Upload className="h-10 w-10 mx-auto text-muted-foreground mb-4" />
-            <p className="text-sm font-medium">Drop files here or click to upload</p>
-            <p className="text-xs text-muted-foreground mt-1">Supported formats: FIT, TCX, GPX, JSON</p>
+            <p className="text-sm font-medium">Trascina i file qui o clicca per caricare</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Formati supportati: FIT, TCX, GPX, JSON
+            </p>
             <Button variant="outline" className="mt-4 bg-transparent">
-              Select Files
+              Seleziona File
             </Button>
           </div>
         </CardContent>
       </Card>
 
-      {showApiKeyModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <Card className="w-full max-w-md mx-4">
-            <CardHeader>
-              <CardTitle>Enter API Key</CardTitle>
-              <CardDescription>
-                Enter your API key for {providers.find((p) => p.id === showApiKeyModal)?.name}
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="apiKey">API Key</Label>
-                <Input
-                  id="apiKey"
-                  type="password"
-                  placeholder="Enter your API key..."
-                  value={apiKey}
-                  onChange={(e) => setApiKey(e.target.value)}
-                />
-              </div>
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  className="flex-1 bg-transparent"
-                  onClick={() => {
-                    setShowApiKeyModal(null)
-                    setApiKey("")
-                  }}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  className="flex-1"
-                  onClick={() => handleSaveApiKey(showApiKeyModal)}
-                  disabled={!apiKey.trim() || loading === showApiKeyModal}
-                >
-                  {loading === showApiKeyModal ? (
-                    <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                  ) : (
-                    <Check className="h-4 w-4 mr-2" />
-                  )}
-                  Save
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      )}
+      {/* Powered by Rook */}
+      <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
+        <span>Powered by</span>
+        <a 
+          href="https://www.tryrook.io" 
+          target="_blank" 
+          rel="noopener noreferrer"
+          className="flex items-center gap-1 hover:text-foreground transition-colors"
+        >
+          TryRook.io
+          <ExternalLink className="h-3 w-3" />
+        </a>
+      </div>
     </div>
   )
 }
