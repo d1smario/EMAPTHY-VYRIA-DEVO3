@@ -22,7 +22,7 @@ import {
   ChevronUp,
   Mountain,
 } from "lucide-react"
-import { getClient } from "@/lib/supabase/client"
+import { createClient } from "@/lib/supabase/client"
 import {
   LineChart,
   Line,
@@ -106,7 +106,7 @@ export function ActivityDetail({ activityId, onBack, hrZones }: ActivityDetailPr
   useEffect(() => {
     const fetchActivity = async () => {
       setIsLoading(true)
-      const supabase = getClient()
+      const supabase = createClient()
       if (!supabase) return
 
       const { data: activityData } = await supabase
