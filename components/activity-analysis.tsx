@@ -19,7 +19,8 @@ import {
   ComposedChart,
 } from "recharts"
 import { TrendingUp, TrendingDown, Activity, Zap } from "lucide-react"
-import { getClient } from "@/lib/supabase/client"
+import { createClient } from "@/lib/supabase/client"
+import { calculatePMC } from "@/lib/calculatePMC" // Import calculatePMC
 
 interface ActivityAnalysisProps {
   athleteId: string | undefined
@@ -51,52 +52,73 @@ export function ActivityAnalysis({ athleteId, hrZones }: ActivityAnalysisProps) 
 
   const loadAnalysisData = async () => {
     setLoading(true)
-    const supabase = getClient()
+    const supabase = createClient()
     const days = Number.parseInt(period)
     const startDate = new Date()
     startDate.setDate(startDate.getDate() - days)
+    const startDateStr = startDate.toISOString().split("T")[0]
 
     try {
-      const { data: dailyMetrics } = await supabase
-        .from("daily_metrics")
-        .select("*")
-        .eq("athlete_id", athleteId)
-        .gte("metric_date", startDate.toISOString().split("T")[0])
-        .order("metric_date", { ascending: true })
-
-      if (dailyMetrics && dailyMetrics.length > 0) {
-        setPmcData(
-          dailyMetrics.map((d) => ({
-            date: new Date(d.metric_date).toLocaleDateString("it-IT", { day: "2-digit", month: "short" }),
-            ctl: d.ctl || 0,
-            atl: d.atl || 0,
-            tsb: d.tsb || 0,
-            tss: d.tss_total || 0,
-          })),
-        )
-
-        const latest = dailyMetrics[dailyMetrics.length - 1]
-        const totalTSS = dailyMetrics.reduce((sum, d) => sum + (d.tss_total || 0), 0)
-        const activeDays = dailyMetrics.filter((d) => d.tss_total > 0).length
-
-        setMetrics({
-          currentCTL: latest.ctl || 0,
-          currentATL: latest.atl || 0,
-          currentTSB: latest.tsb || 0,
-          rampRate: latest.ramp_rate || 0,
-          totalTSS: totalTSS,
-          avgTSS: activeDays > 0 ? Math.round(totalTSS / activeDays) : 0,
-          peakTSS: Math.max(...dailyMetrics.map((d) => d.tss_total || 0)),
-          totalHours: dailyMetrics.reduce((sum, d) => sum + (d.total_duration_minutes || 0), 0) / 60,
-        })
-      }
-
-      const { data: activities } = await supabase
+      // Load planned activities
+      const { data: trainingActivities } = await supabase
         .from("training_activities")
         .select("*")
         .eq("athlete_id", athleteId)
-        .gte("activity_date", startDate.toISOString())
+        .gte("activity_date", startDateStr)
         .order("activity_date", { ascending: true })
+
+      // Load imported activities
+      const { data: importedActivities } = await supabase
+        .from("imported_activities")
+        .select("*")
+        .eq("athlete_id", athleteId)
+        .gte("activity_date", startDateStr)
+        .order("activity_date", { ascending: true })
+
+      // Merge all activities
+      const allActivities = [
+        ...(trainingActivities || []).map(a => ({
+          date: a.activity_date,
+          tss: a.tss || 0,
+          duration: a.duration_minutes || 0,
+          type: a.activity_type,
+        })),
+        ...(importedActivities || []).map(a => ({
+          date: a.activity_date,
+          tss: a.tss || 0,
+          duration: a.duration_seconds ? Math.round(a.duration_seconds / 60) : 0,
+          type: a.activity_type,
+        })),
+      ].sort((a, b) => a.date.localeCompare(b.date))
+
+      console.log("[v0] Analysis: loaded", trainingActivities?.length || 0, "training +", importedActivities?.length || 0, "imported activities")
+
+      // Calculate CTL/ATL/TSB from activities (PMC calculation)
+      if (allActivities.length > 0) {
+        const pmcCalc = calculatePMC(allActivities, days)
+        setPmcData(pmcCalc.dailyData)
+        setMetrics({
+          currentCTL: pmcCalc.currentCTL,
+          currentATL: pmcCalc.currentATL,
+          currentTSB: pmcCalc.currentTSB,
+          rampRate: pmcCalc.rampRate,
+          totalTSS: pmcCalc.totalTSS,
+          avgTSS: pmcCalc.avgTSS,
+          peakTSS: pmcCalc.peakTSS,
+          totalHours: pmcCalc.totalHours,
+        })
+      }
+
+      // For weekly chart, use merged activities
+      const activities = [
+        ...(trainingActivities || []),
+        ...(importedActivities || []).map(a => ({
+          ...a,
+          activity_date: a.activity_date,
+          duration_minutes: a.duration_seconds ? Math.round(a.duration_seconds / 60) : 0,
+          distance_km: a.distance_meters ? a.distance_meters / 1000 : 0,
+        }))
+      ]
 
       if (activities && activities.length > 0) {
         const weeklyGroups: { [key: string]: any } = {}
