@@ -24,6 +24,7 @@ import {
 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import type { RookProvider } from "@/lib/rook/types"
+import { ManualUploadSection } from "@/components/manual-upload-section" // Import ManualUploadSection
 
 interface DeviceIntegrationsProps {
   athleteId?: string
@@ -452,29 +453,7 @@ export function DeviceIntegrations({ athleteId, userId }: DeviceIntegrationsProp
       </Tabs>
 
       {/* Manual Upload Section */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base flex items-center gap-2">
-            <Upload className="h-5 w-5" />
-            Upload Manuale
-          </CardTitle>
-          <CardDescription>
-            Carica file di attivita direttamente dal tuo computer
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="border-2 border-dashed border-muted rounded-lg p-8 text-center">
-            <Upload className="h-10 w-10 mx-auto text-muted-foreground mb-4" />
-            <p className="text-sm font-medium">Trascina i file qui o clicca per caricare</p>
-            <p className="text-xs text-muted-foreground mt-1">
-              Formati supportati: FIT, TCX, GPX, JSON
-            </p>
-            <Button variant="outline" className="mt-4 bg-transparent">
-              Seleziona File
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+      <ManualUploadSection onUploadComplete={loadProviderStatus} />
 
       {/* Powered by Rook */}
       <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
