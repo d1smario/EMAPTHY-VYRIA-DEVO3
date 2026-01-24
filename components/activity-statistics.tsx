@@ -20,7 +20,7 @@ import {
   Cell,
 } from "recharts"
 import { Trophy, Flame, Clock, Route, Mountain, Zap, Calendar } from "lucide-react"
-import { getClient } from "@/lib/supabase/client"
+import { createClient } from "@/lib/supabase/client"
 
 interface ActivityStatisticsProps {
   athleteId: string | undefined
@@ -55,12 +55,13 @@ export function ActivityStatistics({ athleteId }: ActivityStatisticsProps) {
 
   const loadStatistics = async () => {
     setLoading(true)
-    const supabase = getClient()
+    const supabase = createClient()
     const yearStart = `${year}-01-01`
     const yearEnd = `${year}-12-31`
 
     try {
-      const { data: activities } = await supabase
+      // Load planned activities
+      const { data: trainingActivities } = await supabase
         .from("training_activities")
         .select("*")
         .eq("athlete_id", athleteId)
@@ -68,7 +69,31 @@ export function ActivityStatistics({ athleteId }: ActivityStatisticsProps) {
         .lte("activity_date", yearEnd)
         .order("activity_date", { ascending: true })
 
-      if (activities && activities.length > 0) {
+      // Load imported activities
+      const { data: importedActivities } = await supabase
+        .from("imported_activities")
+        .select("*")
+        .eq("athlete_id", athleteId)
+        .gte("activity_date", yearStart)
+        .lte("activity_date", yearEnd)
+        .order("activity_date", { ascending: true })
+
+      // Merge activities, normalizing imported data to match training format
+      const activities = [
+        ...(trainingActivities || []),
+        ...(importedActivities || []).map(a => ({
+          ...a,
+          duration_minutes: a.duration_seconds ? Math.round(a.duration_seconds / 60) : 0,
+          distance_km: a.distance_meters ? Math.round(a.distance_meters / 1000 * 10) / 10 : 0,
+          elevation_gain: a.elevation_gain_meters || 0,
+          calories: a.calories || 0,
+          max_power: a.max_power_watts || 0,
+        }))
+      ]
+
+      console.log("[v0] Statistics: loaded", trainingActivities?.length || 0, "training +", importedActivities?.length || 0, "imported")
+
+      if (activities.length > 0) {
         const stats = activities.reduce(
           (acc, a) => ({
             totalActivities: acc.totalActivities + 1,
