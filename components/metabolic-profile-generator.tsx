@@ -18,11 +18,11 @@ import {
   Save,
   AlertCircle,
 } from "lucide-react"
-import { getClient } from "@/lib/supabase/client"
+import { createClient } from "@/lib/supabase/client"
 
 // ═══════════════════════════════════════════════════════════════════════════
 // EMPATHY PERFORMANCE ANALYSIS - Metabolic Power-Based Profiling
-// ═══════════════════════════════════════════════════════════════════════════
+// ═══════════════════════════���═══════════════════════════════════════════════
 
 interface PowerDurationPoint {
   duration: number
@@ -344,7 +344,7 @@ export function MetabolicProfileGenerator({
 
     try {
       console.log("[v0] handleSave: getting Supabase client")
-      const supabase = getClient()
+      const supabase = createClient()
       if (!supabase) {
         console.log("[v0] handleSave: Supabase client is null")
         setSaveStatus("error")
@@ -625,6 +625,7 @@ export function MetabolicProfileGenerator({
                     <div className="text-right">
                       <p className="text-3xl font-bold text-fuchsia-400">{generatedProfile.cp}W</p>
                       <p className="text-gray-400">Critical Power</p>
+                      <p className="text-xs text-gray-500">{(generatedProfile.cp / weight).toFixed(2)} W/kg</p>
                     </div>
                   </div>
                 </CardContent>
