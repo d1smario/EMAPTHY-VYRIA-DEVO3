@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Pill, Activity, Flame, Clock, Package, Sparkles, ShoppingCart, Download, FileText } from "lucide-react"
+import { Pill, Activity, Flame, Clock, Package, Sparkles, ShoppingCart, Download, FileText, AlertTriangle, RefreshCw } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { AIAnalysisButton } from "@/components/ai-analysis-button"
 import { SUPPLEMENTS_DATABASE, getProductsByBrand, getCompatibleProducts, type SupplementProduct } from "@/lib/data/supplements-database"
@@ -1552,6 +1552,82 @@ const MEAL_DATABASE: Record<
         { name: "Miele", grams: 10 },
       ],
     },
+    // ALTERNATIVE SENZA LATTOSIO
+    {
+      name: "Latte di mandorla caldo con miele",
+      cho: 16,
+      fat: 4,
+      pro: 2,
+      kcal: 108,
+      tags: ["senza-lattosio", "vegan"],
+      ingredients: [
+        { name: "Latte di mandorla", grams: 200 },
+        { name: "Miele", grams: 10 },
+      ],
+    },
+    {
+      name: "Latte di soia caldo con cannella",
+      cho: 12,
+      fat: 4,
+      pro: 8,
+      kcal: 116,
+      tags: ["senza-lattosio", "vegan", "high-protein"],
+      ingredients: [
+        { name: "Latte di soia", grams: 200 },
+        { name: "Cannella", grams: 2 },
+        { name: "Miele", grams: 8 },
+      ],
+    },
+    {
+      name: "Latte di avena caldo con cacao",
+      cho: 22,
+      fat: 3,
+      pro: 3,
+      kcal: 127,
+      tags: ["senza-lattosio", "vegan"],
+      ingredients: [
+        { name: "Latte di avena", grams: 200 },
+        { name: "Cacao amaro", grams: 5 },
+        { name: "Miele", grams: 8 },
+      ],
+    },
+    {
+      name: "Banana con burro di arachidi",
+      cho: 30,
+      fat: 16,
+      pro: 8,
+      kcal: 292,
+      tags: ["senza-lattosio", "vegan"],
+      ingredients: [
+        { name: "Banana", grams: 120 },
+        { name: "Burro di arachidi", grams: 20 },
+      ],
+    },
+    {
+      name: "Tofu silken con miele e semi",
+      cho: 10,
+      fat: 6,
+      pro: 12,
+      kcal: 142,
+      tags: ["senza-lattosio", "vegan", "high-protein"],
+      ingredients: [
+        { name: "Tofu silken", grams: 150 },
+        { name: "Miele", grams: 10 },
+        { name: "Semi di zucca", grams: 10 },
+      ],
+    },
+    {
+      name: "Tisana con biscotti di riso",
+      cho: 25,
+      fat: 2,
+      pro: 2,
+      kcal: 126,
+      tags: ["senza-lattosio", "gluten-free"],
+      ingredients: [
+        { name: "Tisana camomilla", grams: 200 },
+        { name: "Biscotti di riso", grams: 30 },
+      ],
+    },
     {
       name: "Mandorle e cioccolato fondente",
       cho: 15,
@@ -1650,6 +1726,7 @@ function NutritionPlan({ athleteData, userName }: NutritionPlanProps) {
   const [trainingPreferences, setTrainingPreferences] = useState<TrainingPreferences | null>(null)
   const [aiSubstitutions, setAiSubstitutions] = useState<AISubstitution[]>([])
   const [aiAdaptiveEnabled, setAiAdaptiveEnabled] = useState(false)
+  const [metabolicPhase, setMetabolicPhase] = useState<'maintenance' | 'anabolic' | 'catabolic'>('maintenance')
   const [refreshTrigger, setRefreshTrigger] = useState(0) // Used to trigger data reload after AI changes
   const [aiAdaptations, setAiAdaptations] = useState<{
     nutrition?: {
@@ -2081,7 +2158,7 @@ if (annualPlan?.config_json?.training_preferences) {
     return Math.round(370 + 21.6 * lbm)
   }, [weight])
 
-  // Calculate daily calories - apply AI adaptations if available
+  // Calculate daily calories - apply AI adaptations and metabolic phase
   const dailyKcal = useMemo(() => {
     // Base: BMR + 15% TEF (this is for REST days - no workout)
     const restDayKcal = Math.round(bmr * 1.15)
@@ -2089,14 +2166,33 @@ if (annualPlan?.config_json?.training_preferences) {
     // For workout days: BMR + TEF + 40% workout kcal (60% comes from fueling)
     const workoutDayKcal = Math.round(bmr * 1.15 + workoutMetrics.kcal * 0.4)
     
-    // If AI adaptive is enabled, use AI's calculated daily_kcal (already includes adjustments)
-    if (aiAdaptiveEnabled && aiAdaptations?.nutrition?.daily_kcal) {
-      return aiAdaptations.nutrition.daily_kcal
+    // Base calculation
+    let baseKcal = selectedActivity ? workoutDayKcal : restDayKcal
+    
+    // Apply metabolic phase adjustment
+    // Anabolic: +10-15% surplus for muscle building
+    // Catabolic: -15-20% deficit for fat loss
+    // Maintenance: no change
+    if (metabolicPhase === 'anabolic') {
+      baseKcal = Math.round(baseKcal * 1.12) // +12% surplus
+    } else if (metabolicPhase === 'catabolic') {
+      baseKcal = Math.round(baseKcal * 0.85) // -15% deficit
     }
     
-    // Otherwise use local calculation based on whether there's a workout
-    return selectedActivity ? workoutDayKcal : restDayKcal
-  }, [bmr, workoutMetrics.kcal, aiAdaptations, aiAdaptiveEnabled, selectedActivity])
+    // If AI adaptive is enabled, use AI's calculated daily_kcal (already includes adjustments)
+    if (aiAdaptiveEnabled && aiAdaptations?.nutrition?.daily_kcal) {
+      // Apply phase adjustment to AI calculation too
+      let aiKcal = aiAdaptations.nutrition.daily_kcal
+      if (metabolicPhase === 'anabolic') {
+        aiKcal = Math.round(aiKcal * 1.12)
+      } else if (metabolicPhase === 'catabolic') {
+        aiKcal = Math.round(aiKcal * 0.85)
+      }
+      return aiKcal
+    }
+    
+    return baseKcal
+  }, [bmr, workoutMetrics.kcal, aiAdaptations, aiAdaptiveEnabled, selectedActivity, metabolicPhase])
 
   // Calculate intra-workout CHO - EMPATHY LOGIC based on zone and duration
   const intraWorkCho = useMemo(() => {
@@ -2468,11 +2564,79 @@ if (annualPlan?.config_json?.training_preferences) {
     const weekPlan: Record<number, typeof mealPlan> = {}
     const usedFoods: WeeklyFoodUsage = {}
 
-  // APPROCCIO CLASSICO: Nessun filtro sui pasti
-  // Le intolleranze vengono segnalate come avviso nel report
-  const filterMeals = (meals: typeof MEAL_DATABASE.colazione) => meals
+  // FILTRO ATTIVO: Filtra pasti in base a intolleranze e allergie
+  const filterMeals = (meals: typeof MEAL_DATABASE.colazione) => {
+    if (!athleteConstraints) return meals
+    
+    const intolerances = (athleteConstraints.intolerances || []).map(i => i.toLowerCase())
+    const allergies = (athleteConstraints.allergies || []).map(a => a.toLowerCase())
+    const foodsToAvoid = (athleteConstraints.foods_to_avoid || []).map(f => f.toLowerCase())
+    
+    const hasLactoseIntolerance = intolerances.some(i => i.includes('lattosio') || i.includes('latticini'))
+    const hasGlutenIntolerance = intolerances.some(i => i.includes('glutine')) || allergies.some(a => a.includes('glutine') || a.includes('celiac'))
+    const hasEggAllergy = allergies.some(a => a.includes('uova') || a.includes('uovo'))
+    const hasNutAllergy = allergies.some(a => a.includes('frutta secca') || a.includes('noci') || a.includes('arachidi'))
+    const hasNickelAllergy = allergies.some(a => a.includes('nichel'))
+    
+    return meals.filter(meal => {
+      // FIX: Extract ingredient names correctly (they are objects with {name, grams})
+      const ingredientNames = (meal.ingredients || []).map(i => (i.name || '').toLowerCase())
+      const tags = (meal.tags || []).map(t => t.toLowerCase())
+      
+      // Check tags first - quick exclusion
+      if (hasLactoseIntolerance && tags.includes('latticini')) return false
+      if (hasGlutenIntolerance && tags.includes('glutine') && !tags.includes('gluten-free')) return false
+      if (hasNutAllergy && tags.includes('fruttasecca')) return false
+      
+      // Check for lactose intolerance in ingredients
+      if (hasLactoseIntolerance) {
+        if (ingredientNames.some(ing => 
+          ing.includes('latte') || ing.includes('yogurt') || ing.includes('formaggio') || 
+          ing.includes('ricotta') || ing.includes('mozzarella') || ing.includes('parmigiano') ||
+          ing.includes('burro') || ing.includes('panna') || ing.includes('cottage')
+        )) return false
+      }
+      
+      // Check for gluten intolerance/celiac - only exclude if NOT gluten-free tagged
+      if (hasGlutenIntolerance) {
+        if (ingredientNames.some(ing => 
+          ing.includes('pane') || ing.includes('pasta') || ing.includes('farina') || 
+          ing.includes('avena') || ing.includes('orzo') || ing.includes('farro') ||
+          ing.includes('seitan') || ing.includes('crackers')
+        ) && !tags.includes('gluten-free')) return false
+      }
+      
+      // Check for egg allergy
+      if (hasEggAllergy) {
+        if (ingredientNames.some(ing => ing.includes('uova') || ing.includes('uovo'))) return false
+      }
+      
+      // Check for nut allergy
+      if (hasNutAllergy) {
+        if (ingredientNames.some(ing => 
+          ing.includes('noci') || ing.includes('mandorle') || ing.includes('nocciole') || 
+          ing.includes('arachidi') || ing.includes('pistacchi') || ing.includes('anacardi')
+        )) return false
+      }
+      
+      // Check for nickel allergy
+      if (hasNickelAllergy) {
+        if (ingredientNames.some(ing => 
+          ing.includes('pomodoro') || ing.includes('spinaci') || ing.includes('cacao') || 
+          ing.includes('cioccolato') || ing.includes('lenticchie') || ing.includes('fagioli')
+        )) return false
+      }
+      
+      // Check AI-specified foods to avoid
+      if (foodsToAvoid.length > 0) {
+        if (ingredientNames.some(ing => foodsToAvoid.some(avoid => ing.includes(avoid)))) return false
+      }
+      
+      return true
+    })
+  }
 
-  // EMPATHY meal selection: rotazione + adattamento al tipo di giornata
+  // EMPATHY meal selection: rotazione + adattamento al tipo di giornata + 2 alternative
   const selectMealWithRotation = (meals: typeof MEAL_DATABASE.colazione, mealType: string, targetKcal: number, dayIndex: number, workoutType: string) => {
     // Prioritize meals based on workout type
     let filteredMeals = [...meals]
@@ -2505,7 +2669,24 @@ if (annualPlan?.config_json?.training_preferences) {
     // Apply rotation offset based on day + mealType for variety
     const mealTypeOffset = mealType.charCodeAt(0) % 5
     const rotationIndex = (dayIndex + mealTypeOffset) % filteredMeals.length
-    return filteredMeals[rotationIndex]
+    const selectedMeal = filteredMeals[rotationIndex]
+    
+    // Get 2 alternatives (different from selected, spread across the list)
+    const alternatives: typeof selectedMeal[] = []
+    if (filteredMeals.length > 1) {
+      const alt1Index = (rotationIndex + Math.ceil(filteredMeals.length / 3)) % filteredMeals.length
+      if (alt1Index !== rotationIndex) {
+        alternatives.push(filteredMeals[alt1Index])
+      }
+    }
+    if (filteredMeals.length > 2) {
+      const alt2Index = (rotationIndex + Math.ceil(filteredMeals.length * 2 / 3)) % filteredMeals.length
+      if (alt2Index !== rotationIndex && !alternatives.includes(filteredMeals[alt2Index])) {
+        alternatives.push(filteredMeals[alt2Index])
+      }
+    }
+    
+    return { selected: selectedMeal, alternatives }
   }
 
   // Generate plan for each day of the week
@@ -2530,7 +2711,9 @@ if (annualPlan?.config_json?.training_preferences) {
         dayWorkoutKcal = Math.round(consumption.kcalH * durationHours)
       }
 
-      const dayDailyKcal = Math.round(bmr + bmr * 0.15 + dayWorkoutKcal * 0.4)
+      // Apply metabolic phase multiplier to daily kcal
+      const phaseMultiplier = metabolicPhase === 'anabolic' ? 1.12 : metabolicPhase === 'catabolic' ? 0.85 : 1.0
+      const dayDailyKcal = Math.round((bmr + bmr * 0.15 + dayWorkoutKcal * 0.4) * phaseMultiplier)
 
       const mealTimes: Record<string, string> = {}
       const mealLabels: Record<string, string> = {}
@@ -2543,7 +2726,7 @@ if (annualPlan?.config_json?.training_preferences) {
         mealDistributionConfig[meal.type] = { pct: meal.kcalPct, macro: meal.macroRatio }
       })
 
-      // Define dayPlan with ingredients
+      // Define dayPlan with ingredients and alternatives
       const dayPlan: {
         meal: string
         name: string
@@ -2553,6 +2736,7 @@ if (annualPlan?.config_json?.training_preferences) {
         fat: number
         time: string
         ingredients: { name: string; grams: number }[]
+        alternatives?: { name: string; kcal: number; cho: number; pro: number; fat: number; ingredients: { name: string; grams: number }[] }[]
       }[] = []
 
       Object.entries(mealDistributionConfig).forEach(([mealType, config]) => {
@@ -2561,13 +2745,29 @@ if (annualPlan?.config_json?.training_preferences) {
 
   if (filteredMeals.length > 0) {
   const targetKcal = dayDailyKcal * config.pct
-  const selectedMeal = selectMealWithRotation(filteredMeals, mealType, targetKcal, dayIndex, workoutType)
+  const { selected: selectedMeal, alternatives } = selectMealWithRotation(filteredMeals, mealType, targetKcal, dayIndex, workoutType)
   const scale = targetKcal / selectedMeal.kcal
 
           const scaledIngredients = selectedMeal.ingredients.map((ing) => ({
             name: ing.name,
             grams: Math.round(ing.grams * scale),
           }))
+          
+          // Scale alternatives too
+          const scaledAlternatives = alternatives.map(alt => {
+            const altScale = targetKcal / alt.kcal
+            return {
+              name: alt.name,
+              kcal: Math.round(alt.kcal * altScale),
+              cho: Math.round(alt.cho * altScale),
+              pro: Math.round(alt.pro * altScale),
+              fat: Math.round(alt.fat * altScale),
+              ingredients: alt.ingredients.map(ing => ({
+                name: ing.name,
+                grams: Math.round(ing.grams * altScale),
+              }))
+            }
+          })
 
           dayPlan.push({
             meal: mealLabels[mealType] || mealType,
@@ -2578,6 +2778,7 @@ if (annualPlan?.config_json?.training_preferences) {
             fat: Math.round(selectedMeal.fat * scale),
             time: mealTimes[mealType] || "12:00",
             ingredients: scaledIngredients,
+            alternatives: scaledAlternatives.length > 0 ? scaledAlternatives : undefined,
           })
         }
       })
@@ -2589,7 +2790,7 @@ if (annualPlan?.config_json?.training_preferences) {
     setWeeklyFoodUsage(usedFoods)
 
     return weekPlan
-  }, [bmr, weeklyActivities, athleteConstraints, metabolicProfile, dailyKcal, calculateMealTiming, trainingPreferences])
+  }, [bmr, weeklyActivities, athleteConstraints, metabolicProfile, dailyKcal, calculateMealTiming, trainingPreferences, metabolicPhase])
 
   // Get meal plan for selected day - AI substitutions are applied inline to ingredients during rendering
   const mealPlan = useMemo(() => {
@@ -3048,6 +3249,36 @@ const { meals: calculatedMeals, profile: workoutProfile } = calculateMealTiming(
         <Activity className="h-4 w-4 mr-1" />
         {aiAdaptiveEnabled ? "AI Attivo" : "AI Adattivo"}
       </Button>
+      {/* Metabolic Phase Selector */}
+      <div className="flex items-center gap-1 border rounded-md p-0.5">
+        <Button
+          variant={metabolicPhase === 'catabolic' ? 'default' : 'ghost'}
+          size="sm"
+          onClick={() => setMetabolicPhase('catabolic')}
+          className={`px-2 h-7 text-xs ${metabolicPhase === 'catabolic' ? 'bg-red-600 hover:bg-red-700' : 'text-red-400 hover:text-red-300'}`}
+          title="Fase catabolica: -15% kcal per perdita grasso"
+        >
+          Deficit
+        </Button>
+        <Button
+          variant={metabolicPhase === 'maintenance' ? 'default' : 'ghost'}
+          size="sm"
+          onClick={() => setMetabolicPhase('maintenance')}
+          className={`px-2 h-7 text-xs ${metabolicPhase === 'maintenance' ? 'bg-gray-600 hover:bg-gray-700' : 'text-gray-400 hover:text-gray-300'}`}
+          title="Mantenimento: calorie bilanciate"
+        >
+          Mantieni
+        </Button>
+        <Button
+          variant={metabolicPhase === 'anabolic' ? 'default' : 'ghost'}
+          size="sm"
+          onClick={() => setMetabolicPhase('anabolic')}
+          className={`px-2 h-7 text-xs ${metabolicPhase === 'anabolic' ? 'bg-green-600 hover:bg-green-700' : 'text-green-400 hover:text-green-300'}`}
+          title="Fase anabolica: +12% kcal per costruzione muscolare"
+        >
+          Surplus
+        </Button>
+      </div>
   <AIAnalysisButton
   athleteId={athleteData.id}
   endpoint="nutrition"
@@ -3253,11 +3484,11 @@ const { meals: calculatedMeals, profile: workoutProfile } = calculateMealTiming(
           </div>
         </div>
         <div className="text-center p-2 bg-background/50 rounded">
-          <div className="text-xs text-muted-foreground">Kcal Totali</div>
+          <div className="text-xs text-muted-foreground">Kcal Totali Giorno</div>
           <div className="text-lg font-bold text-cyan-400">
-            {dailyKcal + workoutMetrics.kcal}
-            <span className="text-xs ml-1 text-green-400">
-              (+{workoutMetrics.kcal})
+            {dailyKcal}
+            <span className="text-xs ml-1 text-muted-foreground">
+              (BMR + TEF + 40% workout)
             </span>
           </div>
         </div>
@@ -3432,38 +3663,125 @@ const { meals: calculatedMeals, profile: workoutProfile } = calculateMealTiming(
       </ul>
     </div>
     
-    {/* AI Alternatives Column - only show if there are alternatives */}
-    {meal.ingredients.some((ing: any) => 
-      aiSubstitutions.some(s => ing.name.toLowerCase().includes(s.original.toLowerCase()))
-    ) && (
-      <div className="border-l border-cyan-500/30 pl-4">
-        <div className="flex items-center gap-1 mb-1">
-          <Sparkles className="h-3 w-3 text-cyan-400" />
-          <strong className="text-cyan-400">Alternative AI:</strong>
+    {/* Alternatives Column - for allergies/intolerances and AI suggestions */}
+    {(() => {
+      // Build automatic substitutions based on athlete constraints
+      const autoSubstitutions: Record<string, { sub: string; reason: string }> = {
+        // Lactose
+        'latte': { sub: 'Latte senza lattosio / Latte di mandorla', reason: 'Intolleranza lattosio' },
+        'yogurt': { sub: 'Yogurt senza lattosio / Yogurt di soia', reason: 'Intolleranza lattosio' },
+        'formaggio': { sub: 'Formaggio stagionato (meno lattosio) / Tofu', reason: 'Intolleranza lattosio' },
+        'ricotta': { sub: 'Ricotta senza lattosio / Hummus', reason: 'Intolleranza lattosio' },
+        'mozzarella': { sub: 'Mozzarella senza lattosio', reason: 'Intolleranza lattosio' },
+        'burro': { sub: 'Olio EVO / Margarina vegetale', reason: 'Intolleranza lattosio' },
+        'panna': { sub: 'Panna vegetale / Latte di cocco', reason: 'Intolleranza lattosio' },
+        // Gluten
+        'pane': { sub: 'Pane senza glutine / Gallette di riso', reason: 'Celiachia/Glutine' },
+        'pasta': { sub: 'Pasta di riso / Pasta di legumi', reason: 'Celiachia/Glutine' },
+        'farina': { sub: 'Farina di riso / Farina di mandorle', reason: 'Celiachia/Glutine' },
+        'avena': { sub: 'Avena certificata GF / Quinoa', reason: 'Celiachia/Glutine' },
+        'crackers': { sub: 'Crackers senza glutine / Gallette', reason: 'Celiachia/Glutine' },
+        // Eggs
+        'uova': { sub: 'Tofu strapazzato / Semi di lino + acqua', reason: 'Allergia uova' },
+        'uovo': { sub: 'Tofu strapazzato / Semi di chia', reason: 'Allergia uova' },
+        // Nuts
+        'noci': { sub: 'Semi di zucca / Semi di girasole', reason: 'Allergia frutta secca' },
+        'mandorle': { sub: 'Semi di zucca / Cocco', reason: 'Allergia frutta secca' },
+        'nocciole': { sub: 'Semi di girasole', reason: 'Allergia frutta secca' },
+        'arachidi': { sub: 'Semi di zucca / Ceci tostati', reason: 'Allergia arachidi' },
+        // Nickel
+        'pomodoro': { sub: 'Peperoni rossi / Zucchine', reason: 'Allergia nichel' },
+        'spinaci': { sub: 'Lattuga / Rucola', reason: 'Allergia nichel' },
+        'cioccolato': { sub: 'Carruba', reason: 'Allergia nichel' },
+        'cacao': { sub: 'Carruba in polvere', reason: 'Allergia nichel' },
+      }
+      
+      const intolerances = (athleteConstraints?.intolerances || []).map((i: string) => i.toLowerCase())
+      const allergies = (athleteConstraints?.allergies || []).map((a: string) => a.toLowerCase())
+      const hasLactose = intolerances.some(i => i.includes('lattosio') || i.includes('latticini'))
+      const hasGluten = intolerances.some(i => i.includes('glutine')) || allergies.some(a => a.includes('glutine') || a.includes('celiac'))
+      const hasEggs = allergies.some(a => a.includes('uova') || a.includes('uovo'))
+      const hasNuts = allergies.some(a => a.includes('frutta secca') || a.includes('noci') || a.includes('arachidi'))
+      const hasNickel = allergies.some(a => a.includes('nichel'))
+      
+      const relevantSubs = meal.ingredients.map((ing: any) => {
+        const ingLower = ing.name.toLowerCase()
+        
+        // Check AI substitutions first
+        const aiSub = aiSubstitutions.find(s => ingLower.includes(s.original.toLowerCase()))
+        if (aiSub) return { ing, sub: aiSub.substitute, reason: aiSub.reason, type: 'ai' }
+        
+        // Then check automatic substitutions based on constraints
+        for (const [key, value] of Object.entries(autoSubstitutions)) {
+          if (ingLower.includes(key)) {
+            // Only suggest if relevant intolerance/allergy exists
+            if (value.reason.includes('lattosio') && hasLactose) return { ing, ...value, type: 'auto' }
+            if (value.reason.includes('Glutine') && hasGluten) return { ing, ...value, type: 'auto' }
+            if (value.reason.includes('uova') && hasEggs) return { ing, ...value, type: 'auto' }
+            if (value.reason.includes('frutta secca') && hasNuts) return { ing, ...value, type: 'auto' }
+            if (value.reason.includes('arachidi') && hasNuts) return { ing, ...value, type: 'auto' }
+            if (value.reason.includes('nichel') && hasNickel) return { ing, ...value, type: 'auto' }
+          }
+        }
+        return null
+      }).filter(Boolean)
+      
+      if (relevantSubs.length === 0) return null
+      
+      return (
+        <div className="border-l border-amber-500/30 pl-4">
+          <div className="flex items-center gap-1 mb-1">
+            <AlertTriangle className="h-3 w-3 text-amber-400" />
+            <strong className="text-amber-400">Alternative per allergie:</strong>
+          </div>
+          <ul className="list-disc list-inside mt-1 space-y-0.5">
+            {relevantSubs.map((item: any, idx: number) => (
+              <li key={idx} className={item.type === 'ai' ? 'text-cyan-400' : 'text-amber-300'}>
+                <span className="text-muted-foreground">{item.ing.name}</span>
+                <span className="mx-1">→</span>
+                <span>{item.sub}: {item.ing.grams}g</span>
+                <span className="text-xs text-muted-foreground ml-1">({item.reason})</span>
+              </li>
+            ))}
+          </ul>
         </div>
-        <ul className="list-disc list-inside mt-1">
-          {meal.ingredients.map((ing: any, ingIndex: number) => {
-            const substitution = aiSubstitutions.find(s => 
-              ing.name.toLowerCase().includes(s.original.toLowerCase())
-            )
-            
-            if (substitution) {
-              return (
-                <li key={ingIndex} className="text-cyan-400">
-                  {substitution.substitute === "evitare" 
-                    ? <span className="text-red-400">Evitare {ing.name}</span>
-                    : `${substitution.substitute}: ${ing.grams}g`}
-                  <span className="text-xs text-muted-foreground ml-1">({substitution.reason})</span>
-                </li>
-              )
-            }
-            return null
-          }).filter(Boolean)}
-        </ul>
+      )
+    })()}
+  </div>
+  </div>
+  
+  {/* Alternative Meal Options */}
+  {meal.alternatives && meal.alternatives.length > 0 && (
+    <div className="mt-4 pt-4 border-t border-border/50">
+      <div className="flex items-center gap-2 mb-3">
+        <RefreshCw className="h-4 w-4 text-blue-400" />
+        <strong className="text-blue-400 text-sm">Alternative a scelta:</strong>
       </div>
-    )}
-  </div>
-  </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        {meal.alternatives.map((alt: any, altIdx: number) => (
+          <div key={altIdx} className="bg-background/50 border border-border/50 rounded-lg p-3 hover:border-blue-500/50 transition-colors cursor-pointer">
+            <div className="flex justify-between items-start mb-2">
+              <span className="font-medium text-sm">{alt.name}</span>
+              <Badge variant="outline" className="text-xs">{alt.kcal} kcal</Badge>
+            </div>
+            <div className="flex gap-2 mb-2 text-xs">
+              <span className="text-amber-400">C: {alt.cho}g</span>
+              <span className="text-red-400">P: {alt.pro}g</span>
+              <span className="text-blue-400">F: {alt.fat}g</span>
+            </div>
+            <ul className="text-xs text-muted-foreground space-y-0.5">
+              {alt.ingredients.slice(0, 4).map((ing: any, ingIdx: number) => (
+                <li key={ingIdx}>{ing.name}: {ing.grams}g</li>
+              ))}
+              {alt.ingredients.length > 4 && (
+                <li className="text-muted-foreground/60">+{alt.ingredients.length - 4} altri...</li>
+              )}
+            </ul>
+          </div>
+        ))}
+      </div>
+    </div>
+  )}
                         </CardContent>
                       </Card>
                     ))
