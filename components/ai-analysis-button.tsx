@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
-import { Sparkles, X, AlertTriangle, CheckCircle, Info, Loader2 } from "lucide-react"
+import { Sparkles, X, AlertTriangle, CheckCircle, Info, Loader2, Wand2, Check, Download } from "lucide-react"
 import {
   Dialog,
   DialogContent,
@@ -20,6 +20,7 @@ interface AIAnalysisButtonProps {
   buttonText?: string
   buttonVariant?: "default" | "outline" | "ghost"
   buttonSize?: "default" | "sm" | "lg" | "icon"
+  onApplied?: () => void // Callback when changes are applied successfully
 }
 
 interface Alert {
@@ -39,12 +40,58 @@ export function AIAnalysisButton({
   context,
   buttonText = "AI Analisi",
   buttonVariant = "outline",
-  buttonSize = "sm"
+  buttonSize = "sm",
+  onApplied
 }: AIAnalysisButtonProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [result, setResult] = useState<any>(null)
   const [error, setError] = useState<string | null>(null)
+  const [proposedChanges, setProposedChanges] = useState<any>(null)
+  const [isProposing, setIsProposing] = useState(false)
+  const [isApplying, setIsApplying] = useState(false)
+  const [applyResult, setApplyResult] = useState<any>(null)
+  const [isDownloading, setIsDownloading] = useState(false)
+
+  // Download plan as PDF
+  const downloadPlanPDF = async () => {
+    if (!proposedChanges) return
+    setIsDownloading(true)
+    
+    try {
+      const response = await fetch("/api/ai/generate-plan-pdf", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          athleteId,
+          planType: endpoint === "training" ? "training" : "nutrition",
+          planData: proposedChanges
+        })
+      })
+
+      const data = await response.json()
+      
+      if (!data.success) {
+        throw new Error(data.error || "Generazione PDF fallita")
+      }
+
+      // Open HTML in new window for printing
+      const printWindow = window.open('', '_blank')
+      if (printWindow) {
+        printWindow.document.write(data.html)
+        printWindow.document.close()
+        // Auto-trigger print dialog
+        setTimeout(() => {
+          printWindow.print()
+        }, 500)
+      }
+    } catch (err) {
+      console.error("[v0] PDF download error:", err)
+      setError(err instanceof Error ? err.message : "Errore download PDF")
+    } finally {
+      setIsDownloading(false)
+    }
+  }
 
   const runAnalysis = async () => {
     setIsLoading(true)
@@ -76,6 +123,84 @@ export function AIAnalysisButton({
     setIsOpen(true)
     if (!result && !isLoading) {
       runAnalysis()
+    }
+  }
+
+  // Propose structured changes based on analysis
+  const proposeChanges = async () => {
+    setIsProposing(true)
+    setApplyResult(null)
+    
+    try {
+      const response = await fetch("/api/ai/propose-changes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ 
+          athleteId, 
+          type: endpoint,
+          currentAnalysis: result?.analysis 
+        })
+      })
+
+      const data = await response.json()
+      console.log("[v0] Propose changes response:", data)
+      
+      if (!data.success) {
+        throw new Error(data.error || "Proposta modifiche fallita")
+      }
+
+      // API returns proposedChanges, not changes
+      setProposedChanges(data.proposedChanges)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Errore nella proposta modifiche")
+    } finally {
+      setIsProposing(false)
+    }
+  }
+
+  // Apply the proposed changes
+  const applyChanges = async () => {
+    if (!proposedChanges) return
+    
+    setIsApplying(true)
+    
+    try {
+      const applyEndpoint = endpoint === "nutrition" || endpoint === "microbiome" || endpoint === "epigenetics"
+        ? "/api/ai/apply-nutrition"
+        : "/api/ai/apply-training"
+
+      const response = await fetch(applyEndpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ 
+          athleteId, 
+          changes: proposedChanges
+        })
+      })
+
+      const data = await response.json()
+      setApplyResult(data)
+      
+      if (data.success) {
+        // Close dialog and notify parent to refresh data
+        setTimeout(() => {
+          setIsOpen(false) // Close the dialog
+          setProposedChanges(null)
+          setResult(null)
+          setApplyResult(null)
+          // Call the onApplied callback to refresh parent data
+          if (onApplied) {
+            onApplied()
+          }
+        }, 1500) // Short delay to show success message
+      }
+    } catch (err) {
+      setApplyResult({ 
+        success: false, 
+        message: err instanceof Error ? err.message : "Errore nell'applicazione modifiche" 
+      })
+    } finally {
+      setIsApplying(false)
     }
   }
 
@@ -661,6 +786,186 @@ export function AIAnalysisButton({
     }
   }
 
+  const renderProposedChanges = () => {
+    if (!proposedChanges) return null
+
+    return (
+      <div className="mt-4 p-4 rounded-lg border-2 border-cyan-500/50 bg-cyan-500/5">
+        <div className="flex items-center gap-2 mb-3">
+          <Wand2 className="h-5 w-5 text-cyan-400" />
+          <h4 className="font-medium">Modifiche Proposte</h4>
+        </div>
+
+        {/* Summary */}
+        {proposedChanges.summary && (
+          <div className="mb-3 p-2 rounded bg-cyan-500/10">
+            <p className="text-sm">{proposedChanges.summary}</p>
+          </div>
+        )}
+
+        {/* Warnings */}
+        {proposedChanges.warnings && proposedChanges.warnings.length > 0 && (
+          <div className="mb-3 p-2 rounded bg-yellow-500/10 border border-yellow-500/30">
+            <p className="text-sm font-medium mb-1 text-yellow-400">Avvisi</p>
+            <ul className="text-xs list-disc list-inside">
+              {proposedChanges.warnings.map((w: string, i: number) => (
+                <li key={i}>{w}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {/* Changes List */}
+        {proposedChanges.changes && proposedChanges.changes.length > 0 && (
+          <div className="mb-3 p-2 rounded bg-secondary/50">
+            <p className="text-sm font-medium mb-2">Modifiche Proposte</p>
+            <ul className="text-xs space-y-2">
+              {proposedChanges.changes.map((c: any, i: number) => (
+                <li key={i} className={`p-2 rounded ${
+                  c.priority === 'alta' ? 'bg-red-500/10 border-l-2 border-red-500' :
+                  c.priority === 'media' ? 'bg-yellow-500/10 border-l-2 border-yellow-500' :
+                  'bg-green-500/10 border-l-2 border-green-500'
+                }`}>
+                  <div className="flex justify-between items-start">
+                    <span className="font-medium capitalize">{c.category}: {c.field}</span>
+                    <span className="text-[10px] uppercase px-1 rounded bg-background">{c.priority}</span>
+                  </div>
+                  <div className="mt-1 text-muted-foreground">
+                    {c.currentValue && <span className="line-through mr-2">{c.currentValue}</span>}
+                    <span className="text-cyan-400">{c.proposedValue}</span>
+                  </div>
+                  <p className="mt-1 text-muted-foreground italic">{c.reason}</p>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {/* Weekly Plan - Nutrition */}
+        {proposedChanges.weeklyPlan && typeof proposedChanges.weeklyPlan === 'object' && !Array.isArray(proposedChanges.weeklyPlan) && (
+          <div className="mb-3 p-2 rounded bg-secondary/50">
+            <p className="text-sm font-medium mb-2">Piano Settimanale Nutrizione</p>
+            <div className="space-y-2 text-xs">
+              {Object.entries(proposedChanges.weeklyPlan).map(([day, meals]: [string, any]) => (
+                <div key={day} className="p-2 rounded bg-background/50">
+                  <p className="font-medium capitalize mb-1">{day}</p>
+                  <div className="grid grid-cols-2 gap-1 text-muted-foreground">
+                    {meals?.colazione && <span>Colazione: {meals.colazione}</span>}
+                    {meals?.pranzo && <span>Pranzo: {meals.pranzo}</span>}
+                    {meals?.cena && <span>Cena: {meals.cena}</span>}
+                    {meals?.snack && <span>Snack: {meals.snack}</span>}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Weekly Plan - Training */}
+        {proposedChanges.weeklyPlan && Array.isArray(proposedChanges.weeklyPlan) && (
+          <div className="mb-3 p-2 rounded bg-secondary/50">
+            <p className="text-sm font-medium mb-2">Piano Settimanale Allenamento</p>
+            <div className="space-y-1 text-xs">
+              {proposedChanges.weeklyPlan.map((d: any, i: number) => (
+                <div key={i} className="flex items-center justify-between p-2 rounded bg-background/50">
+                  <span className="font-medium w-20">{d.name || `Giorno ${d.day + 1}`}</span>
+                  <span className="flex-1">{d.workout}</span>
+                  <span className="text-cyan-400">{d.duration}min</span>
+                  <span className="text-muted-foreground ml-2">{d.zone}</span>
+                  <span className="text-yellow-400 ml-2">TSS: {d.tss}</span>
+                </div>
+              ))}
+            </div>
+            {proposedChanges.weeklyTSS && (
+              <div className="mt-2 pt-2 border-t border-border text-xs">
+                <span>TSS Settimanale: </span>
+                <span className="line-through text-muted-foreground mr-2">{proposedChanges.weeklyTSS.current}</span>
+                <span className="text-cyan-400 font-medium">{proposedChanges.weeklyTSS.proposed}</span>
+                {proposedChanges.weeklyTSS.rationale && (
+                  <p className="mt-1 text-muted-foreground italic">{proposedChanges.weeklyTSS.rationale}</p>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Apply Result */}
+        {applyResult && (
+          <div className={`mt-3 p-2 rounded ${applyResult.success ? 'bg-green-500/20' : 'bg-red-500/20'}`}>
+            <div className="flex items-center gap-2">
+              {applyResult.success ? (
+                <CheckCircle className="h-4 w-4 text-green-500" />
+              ) : (
+                <AlertTriangle className="h-4 w-4 text-red-500" />
+              )}
+              <span className="text-sm font-medium">{applyResult.message}</span>
+            </div>
+            {applyResult.results && (
+              <div className="mt-2 text-xs">
+                {applyResult.results.success?.map((s: string, i: number) => (
+                  <p key={i} className="text-green-400">+ {s}</p>
+                ))}
+                {applyResult.results.errors?.map((e: string, i: number) => (
+                  <p key={i} className="text-red-400">- {e}</p>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Action Buttons */}
+        {!applyResult?.success && (
+          <div className="mt-4 space-y-2">
+            <div className="flex gap-2">
+              <Button 
+                onClick={applyChanges} 
+                disabled={isApplying}
+                className="flex-1 bg-cyan-600 hover:bg-cyan-700"
+              >
+                {isApplying ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Applicando...
+                  </>
+                ) : (
+                  <>
+                    <Check className="h-4 w-4 mr-2" />
+                    Applica Modifiche
+                  </>
+                )}
+              </Button>
+              <Button 
+                variant="outline" 
+                onClick={() => setProposedChanges(null)}
+                className="bg-transparent"
+              >
+                Annulla
+              </Button>
+            </div>
+            <Button 
+              variant="outline"
+              onClick={downloadPlanPDF} 
+              disabled={isDownloading}
+              className="w-full bg-transparent border-cyan-500/50 text-cyan-400 hover:bg-cyan-500/10"
+            >
+              {isDownloading ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Generando PDF...
+                </>
+              ) : (
+                <>
+                  <Download className="h-4 w-4 mr-2" />
+                  Scarica Piano PDF
+                </>
+              )}
+            </Button>
+          </div>
+        )}
+      </div>
+    )
+  }
+
   const getTitle = () => {
     switch (endpoint) {
       case "nutrition":
@@ -720,6 +1025,32 @@ export function AIAnalysisButton({
             )}
 
             {result && !isLoading && renderResult()}
+
+            {/* Propose Changes Button */}
+            {result && !isLoading && !proposedChanges && (
+              <div className="mt-4 pt-4 border-t border-border">
+                <Button 
+                  onClick={proposeChanges} 
+                  disabled={isProposing}
+                  className="w-full bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-700 hover:to-blue-700"
+                >
+                  {isProposing ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Generando proposte...
+                    </>
+                  ) : (
+                    <>
+                      <Wand2 className="h-4 w-4 mr-2" />
+                      Vuoi che applichi queste modifiche?
+                    </>
+                  )}
+                </Button>
+              </div>
+            )}
+
+            {/* Render Proposed Changes */}
+            {proposedChanges && renderProposedChanges()}
           </ScrollArea>
         </DialogContent>
       </Dialog>
