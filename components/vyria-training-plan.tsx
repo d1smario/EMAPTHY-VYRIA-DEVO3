@@ -1,5 +1,7 @@
 "use client"
 import { useState, useEffect } from "react"
+import { cn } from "@/lib/utils"
+
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
@@ -39,6 +41,9 @@ import {
   X,
   ChevronUp,
   ChevronDown,
+  Clock,
+  Flame,
+  TrendingUp,
 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { AnnualPlanGenerator } from "./annual-plan-generator"
@@ -104,6 +109,7 @@ interface WorkoutBlock {
 interface TrainingSession {
   sessionId: string
   dayIndex: number // Changed from day to dayIndex
+  activityDate?: string // YYYY-MM-DD format
   sport: string
   workoutType: string
   title: string
@@ -112,6 +118,8 @@ interface TrainingSession {
   targetZone: string
   blocks: WorkoutBlock[]
   tss?: number
+  avgPower?: number
+  kcal?: number
   gymExercises?: Array<{
     name: string
     sets: number
@@ -134,15 +142,77 @@ interface VyriaTrainingPlanProps {
 // ═══════════════════════════════════════════════════════════════════════════
 
 const SPORTS = [
-  { id: "cycling", name: "Ciclismo", icon: Bike },
-  { id: "running", name: "Corsa", icon: Footprints },
-  { id: "swimming", name: "Nuoto", icon: Waves },
-  { id: "triathlon", name: "Triathlon", icon: Activity },
-  { id: "trail_running", name: "Trail Running", icon: Mountain },
-  { id: "gym", name: "Palestra", icon: Dumbbell },
-]
+  { id: "cycling", name: "Ciclismo", icon: Bike, color: "text-yellow-500", supportsPower: true },
+  { id: "running", name: "Corsa", icon: Footprints, color: "text-green-500", supportsPower: false },
+  { id: "swimming", name: "Nuoto", icon: Waves, color: "text-blue-500", supportsPower: false },
+  { id: "triathlon", name: "Triathlon", icon: Activity, color: "text-fuchsia-500", supportsPower: true },
+  { id: "trail_running", name: "Trail Running", icon: Mountain, color: "text-emerald-500", supportsPower: false },
+  { id: "mountain_bike", name: "MTB", icon: Bike, color: "text-orange-500", supportsPower: true },
+  { id: "gravel", name: "Gravel", icon: Bike, color: "text-amber-500", supportsPower: true },
+  { id: "cross_country_ski", name: "Sci Fondo", icon: Activity, color: "text-cyan-500", supportsPower: false },
+  { id: "ski_mountaineering", name: "Scialpinismo", icon: Mountain, color: "text-sky-500", supportsPower: false },
+  { id: "rowing", name: "Canottaggio", icon: Waves, color: "text-indigo-500", supportsPower: true },
+  { id: "gym", name: "Palestra", icon: Dumbbell, color: "text-red-500", supportsPower: false },
+  ]
 
 const DAY_NAMES = ["Lunedì", "Martedì", "Mercoledì", "Giovedì", "Venerdì", "Sabato", "Domenica"]
+
+// TSS Calculation - Formula: TSS = (seconds × IF²) / 3600 × 100
+// IF values per zone based on typical power zones
+const ZONE_IF: Record<string, number> = {
+  Z1: 0.55,  // Recovery
+  Z2: 0.70,  // Endurance
+  Z3: 0.85,  // Tempo
+  Z4: 0.95,  // Threshold
+  Z5: 1.05,  // VO2max
+  Z6: 1.20,  // Anaerobic
+  Z7: 1.50,  // Neuromuscular
+}
+
+// Calculate TSS for a single block
+const calculateBlockTSS = (durationMin: number, zone: string): number => {
+  const IF = ZONE_IF[zone] || 0.70
+  // TSS = (duration_seconds * IF²) / 3600 * 100
+  return (durationMin * 60 * IF * IF) / 3600 * 100
+}
+
+// Calculate total TSS for all blocks
+const calculateTotalTSS = (blocks: any[], calculateBlockDurationFn: (b: any) => number): number => {
+  return blocks.reduce((sum, block) => {
+    const duration = calculateBlockDurationFn(block)
+    return sum + calculateBlockTSS(duration, block.zone)
+  }, 0)
+}
+
+// Calculate kcal based on average power and duration
+// Formula: Work (kJ) = Power (W) × Time (s) / 1000
+// Energy expenditure = Work / efficiency (25% for cycling)
+// kcal = kJ / 4.184
+const calculateKcal = (avgPowerWatts: number, durationMin: number): number => {
+  const durationSeconds = durationMin * 60
+  const workKJ = (avgPowerWatts * durationSeconds) / 1000 // Work in kJ
+  const efficiency = 0.25 // 25% mechanical efficiency
+  const totalEnergyKJ = workKJ / efficiency
+  const kcal = totalEnergyKJ / 4.184 // Convert kJ to kcal
+  return Math.round(kcal)
+}
+
+// Estimate average power based on FTP and zones
+const estimateAvgPower = (blocks: any[], ftp: number, calculateBlockDurationFn: (b: any) => number): number => {
+  const totalDuration = blocks.reduce((sum, b) => sum + calculateBlockDurationFn(b), 0)
+  if (totalDuration === 0) return 0
+  
+  const weightedPower = blocks.reduce((sum, block) => {
+    const duration = calculateBlockDurationFn(block)
+    const zonePercent: Record<string, number> = {
+      Z1: 0.55, Z2: 0.70, Z3: 0.85, Z4: 0.95, Z5: 1.05, Z6: 1.20, Z7: 1.50
+    }
+    const powerForZone = ftp * (zonePercent[block.zone] || 0.70)
+    return sum + (powerForZone * duration)
+  }, 0)
+  
+  return Math.round(weightedPower / totalDuration)
+}
 
 const ZONE_COLORS: Record<string, string> = {
   Z1: "bg-slate-500",
@@ -217,6 +287,7 @@ function VyriaTrainingPlan({ athleteData, userName, onUpdate }: VyriaTrainingPla
   // Weekly Plan State
   const [generatedPlan, setGeneratedPlan] = useState<TrainingSession[]>([])
   const [selectedDay, setSelectedDay] = useState(0)
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date())
 
   // Dialog State
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
@@ -528,37 +599,42 @@ function VyriaTrainingPlan({ athleteData, userName, onUpdate }: VyriaTrainingPla
     setResetWeekDialogOpen(false)
   }
 
-  const saveWeekToTraining = async () => {
-    if (!athleteData?.id || generatedPlan.length === 0) return
-    setSaving(true)
-    try {
-      const { monday, sunday } = getWeekDateRange()
-      await supabase
-        .from("training_activities")
-        .delete()
-        .eq("athlete_id", athleteData.id)
-        .gte("activity_date", monday.toISOString().split("T")[0])
-        .lte("activity_date", sunday.toISOString().split("T")[0])
-
-      const workoutsToInsert = generatedPlan.map((session) => {
-        const activityDate = new Date(monday)
-        activityDate.setDate(monday.getDate() + session.dayIndex) // Use dayIndex here
-        return {
-          athlete_id: athleteData.id,
-          activity_date: activityDate.toISOString().split("T")[0],
-          activity_type: session.sport,
-          workout_type: session.workoutType,
-          title: session.title,
-          description: session.description,
-          duration_minutes: session.duration,
-          targetZone: session.targetZone,
-          tss: session.tss || Math.round(session.duration * 0.8),
-          intervals: { blocks: session.blocks },
-          gym_exercises: session.gymExercises,
-          planned: true,
-          completed: session.completed,
-          source: "vyria_generated",
+const saveWeekToTraining = async () => {
+  if (!athleteData?.id || generatedPlan.length === 0) return
+  
+  setSaving(true)
+  try {
+  const { monday } = getWeekDateRange()
+  
+  const workoutsToInsert = generatedPlan.map((session) => {
+        // Use activityDate if available, otherwise calculate from dayIndex
+        let activityDateStr: string
+        if (session.activityDate) {
+          activityDateStr = session.activityDate
+        } else {
+          const activityDate = new Date(monday)
+          activityDate.setDate(monday.getDate() + session.dayIndex)
+          activityDateStr = activityDate.toISOString().split("T")[0]
         }
+        
+return {
+  athlete_id: athleteData.id,
+  activity_date: activityDateStr,
+  activity_type: session.sport,
+  workout_type: session.workoutType,
+  title: session.title,
+  description: session.description,
+  duration_minutes: session.duration,
+  targetZone: session.targetZone,
+  tss: session.tss || Math.round(session.duration * 0.8),
+  average_power: session.avgPower,
+  calories: session.kcal,
+  intervals: { blocks: session.blocks },
+  gym_exercises: session.gymExercises,
+  planned: true,
+  completed: session.completed,
+  source: "vyria_generated",
+  }
       })
       const { error } = await supabase.from("training_activities").insert(workoutsToInsert)
       if (error) throw error
@@ -734,17 +810,71 @@ function VyriaTrainingPlan({ athleteData, userName, onUpdate }: VyriaTrainingPla
     setShowInlineEditor(false)
   }
 
-  const saveEditorWorkout = () => {
-    if (editorBlocks.length === 0) {
-      alert("Aggiungi almeno un blocco")
-      return
+const saveEditorWorkout = async () => {
+  if (editorBlocks.length === 0) {
+  alert("Aggiungi almeno un blocco")
+  return
+  }
+  
+  if (!athleteData?.id) {
+  alert("Errore: dati atleta non disponibili")
+  return
+  }
+  
+  // Get user_id from auth
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user?.id) {
+  alert("Errore: utente non autenticato")
+  return
+  }
+  
+  const totalDuration = getTotalDuration()
+  const mainZone = editorBlocks.find((b) => b.type !== "warmup" && b.type !== "cooldown")?.zone || "Z2"
+  
+  // Calculate metrics
+  const calculatedTSS = Math.round(calculateTotalTSS(editorBlocks, calculateBlockDuration))
+  const avgPower = estimateAvgPower(editorBlocks, ftpWatts, calculateBlockDuration)
+  const kcal = calculateKcal(avgPower, totalDuration)
+  
+  const activityDateStr = selectedDate.toISOString().split('T')[0]
+  
+  // Save directly to database
+  try {
+  setSaving(true)
+  const workoutData = {
+  athlete_id: athleteData.id,
+  activity_date: activityDateStr,
+  activity_type: editorSport,
+      workout_type: editorBlocks.some((b) => b.type === "intervals")
+        ? "intervals"
+        : editorBlocks[0]?.type || "endurance",
+      title: editorTitle || `Allenamento ${DAY_NAMES[selectedDay]}`,
+      description: editorNotes,
+      duration_minutes: totalDuration,
+      target_zone: mainZone,
+      tss: calculatedTSS,
+      average_power: avgPower,
+      calories: kcal,
+      intervals: { blocks: editorBlocks },
+      planned: true,
+      completed: false,
+      source: "vyria_builder",
     }
-    const totalDuration = getTotalDuration()
-    const mainZone = editorBlocks.find((b) => b.type !== "warmup" && b.type !== "cooldown")?.zone || "Z2"
-
+    
+    console.log("[v0] Saving workout to DB:", workoutData)
+    
+    const { error } = await supabase.from("training_activities").insert(workoutData)
+    
+    if (error) {
+      console.error("[v0] Error saving workout:", error)
+      throw error
+    }
+    
+    // Also add to local state for immediate UI update
     const newSession: TrainingSession = {
       sessionId: generateId(),
       dayIndex: selectedDay,
+      activityDate: activityDateStr,
       sport: editorSport,
       workoutType: editorBlocks.some((b) => b.type === "intervals")
         ? "intervals"
@@ -754,11 +884,22 @@ function VyriaTrainingPlan({ athleteData, userName, onUpdate }: VyriaTrainingPla
       duration: totalDuration,
       targetZone: mainZone,
       blocks: editorBlocks,
-      tss: Math.round(totalDuration * (mainZone === "Z5" ? 1.2 : mainZone === "Z4" ? 1.0 : 0.7)),
+      tss: calculatedTSS,
+      avgPower: avgPower,
+      kcal: kcal,
       completed: false,
     }
     setGeneratedPlan((prev) => [...prev, newSession])
+    
+    alert(`Allenamento salvato per ${activityDateStr}!`)
+    onUpdate?.() // Refresh calendar data
     resetEditor()
+  } catch (err) {
+    console.error("[v0] saveEditorWorkout error:", err)
+    alert("Errore nel salvataggio dell'allenamento")
+  } finally {
+    setSaving(false)
+  }
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -885,46 +1026,93 @@ function VyriaTrainingPlan({ athleteData, userName, onUpdate }: VyriaTrainingPla
           <div className="flex items-center justify-between">
             <CardTitle className="text-lg flex items-center gap-2">
               <Zap className="h-5 w-5 text-fuchsia-500" />
-              Crea Allenamento - {DAY_NAMES[selectedDay]}
+              Crea Allenamento
             </CardTitle>
             <Button variant="ghost" size="icon" onClick={resetEditor}>
               <X className="h-4 w-4" />
             </Button>
           </div>
+          
+          {/* Date Picker */}
+          <div className="mt-3 flex items-center gap-4">
+            <div className="flex items-center gap-2">
+              <CalendarRange className="h-4 w-4 text-muted-foreground" />
+              <Label className="text-xs">Data:</Label>
+              <input
+                type="date"
+                value={selectedDate.toISOString().split('T')[0]}
+                onChange={(e) => {
+                  const newDate = new Date(e.target.value)
+                  setSelectedDate(newDate)
+                  // Update day of week
+                  const dayOfWeek = newDate.getDay()
+                  setSelectedDay(dayOfWeek === 0 ? 6 : dayOfWeek - 1)
+                }}
+                className="bg-background border border-border rounded px-2 py-1 text-sm"
+              />
+            </div>
+            <Badge variant="outline" className="text-xs">
+              {DAY_NAMES[selectedDay]} {selectedDate.toLocaleDateString('it-IT', { day: 'numeric', month: 'short', year: 'numeric' })}
+            </Badge>
+          </div>
         </CardHeader>
-        <div className="max-h-[400px] overflow-y-auto px-6">
+        <div className="max-h-[500px] overflow-y-auto px-6">
           <div className="space-y-4 pb-4">
-            {/* Config Row */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              <div>
-                <Label className="text-xs">Sport</Label>
-                <Select value={editorSport} onValueChange={setEditorSport}>
-                  <SelectTrigger className="h-9">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {SPORTS.filter((s) => s.id !== "gym").map((s) => (
-                      <SelectItem key={s.id} value={s.id}>
-                        <div className="flex items-center gap-2">
-                          <s.icon className="h-4 w-4" />
-                          {s.name}
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+            {/* Sport Selection Grid - VYRIA Style */}
+            <div className="space-y-2">
+              <Label className="text-xs font-medium">Sport Principale</Label>
+              <div className="grid grid-cols-5 md:grid-cols-10 gap-2">
+                {SPORTS.filter((s) => s.id !== "gym").map((sport) => {
+                  const Icon = sport.icon
+                  return (
+                    <button
+                      key={sport.id}
+                      type="button"
+                      onClick={() => setEditorSport(sport.id)}
+                      className={cn(
+                        "p-2 rounded-lg border-2 transition flex flex-col items-center gap-1",
+                        editorSport === sport.id
+                          ? "border-fuchsia-500 bg-fuchsia-500/20"
+                          : "border-border bg-background hover:border-muted-foreground"
+                      )}
+                    >
+                      <Icon className={cn("h-5 w-5", sport.color)} />
+                      <span className="text-[10px]">{sport.name}</span>
+                      {sport.supportsPower && (
+                        <span className="text-[8px] text-fuchsia-400 font-bold">PWR</span>
+                      )}
+                    </button>
+                  )
+                })}
               </div>
+            </div>
+
+            {/* Config Row */}
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
               <div>
-                <Label className="text-xs">Zones Type</Label>
-                <Select value={editorZoneType} onValueChange={(v) => setEditorZoneType(v as "hr" | "power")}>
-                  <SelectTrigger className="h-9">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="power">Potenza (W)</SelectItem>
-                    <SelectItem value="hr">Frequenza (bpm)</SelectItem>
-                  </SelectContent>
-                </Select>
+                <Label className="text-xs">Parametro Zone</Label>
+                <div className="flex gap-2 mt-1">
+                  <Button
+                    type="button"
+                    variant={editorZoneType === "power" ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setEditorZoneType("power")}
+                    className={cn("flex-1 h-9", editorZoneType === "power" ? "bg-fuchsia-600" : "bg-transparent")}
+                  >
+                    <Zap className="h-4 w-4 mr-1" />
+                    Potenza
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={editorZoneType === "hr" ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setEditorZoneType("hr")}
+                    className={cn("flex-1 h-9", editorZoneType === "hr" ? "bg-red-600" : "bg-transparent")}
+                  >
+                    <Heart className="h-4 w-4 mr-1" />
+                    HR
+                  </Button>
+                </div>
               </div>
               <div className="col-span-2">
                 <Label className="text-xs">Nome Allenamento</Label>
@@ -932,9 +1120,116 @@ function VyriaTrainingPlan({ athleteData, userName, onUpdate }: VyriaTrainingPla
                   value={editorTitle}
                   onChange={(e) => setEditorTitle(e.target.value)}
                   placeholder="es. Soglia 2x20"
-                  className="h-9"
+                  className="h-9 bg-background"
                 />
               </div>
+            </div>
+
+            {/* Live Visual Block Chart Preview */}
+            <div className="space-y-3 p-4 bg-background rounded-lg border border-border">
+              {/* Stats Row - Style like statistics cards */}
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                <div className="bg-muted/30 rounded-lg p-2 text-center">
+                  <div className="flex items-center justify-center gap-1 text-muted-foreground text-[10px] mb-1">
+                    <Clock className="h-3 w-3" />
+                    <span>Durata</span>
+                  </div>
+                  <span className="font-bold text-sm">{getTotalDuration()} min</span>
+                </div>
+                <div className="bg-muted/30 rounded-lg p-2 text-center">
+                  <div className="flex items-center justify-center gap-1 text-orange-500 text-[10px] mb-1">
+                    <Zap className="h-3 w-3" />
+                    <span>TSS</span>
+                  </div>
+                  <span className="font-bold text-sm text-orange-500">
+                    {Math.round(calculateTotalTSS(editorBlocks, calculateBlockDuration))}
+                  </span>
+                </div>
+                <div className="bg-muted/30 rounded-lg p-2 text-center">
+                  <div className="flex items-center justify-center gap-1 text-fuchsia-500 text-[10px] mb-1">
+                    <Activity className="h-3 w-3" />
+                    <span>Avg Power</span>
+                  </div>
+                  <span className="font-bold text-sm text-fuchsia-500">
+                    {estimateAvgPower(editorBlocks, ftpWatts, calculateBlockDuration)}W
+                  </span>
+                </div>
+                <div className="bg-muted/30 rounded-lg p-2 text-center">
+                  <div className="flex items-center justify-center gap-1 text-red-500 text-[10px] mb-1">
+                    <Flame className="h-3 w-3" />
+                    <span>kcal</span>
+                  </div>
+                  <span className="font-bold text-sm text-red-500">
+                    {calculateKcal(estimateAvgPower(editorBlocks, ftpWatts, calculateBlockDuration), getTotalDuration())}
+                  </span>
+                </div>
+                <div className="bg-muted/30 rounded-lg p-2 text-center">
+                  <div className="flex items-center justify-center gap-1 text-cyan-500 text-[10px] mb-1">
+                    <TrendingUp className="h-3 w-3" />
+                    <span>IF</span>
+                  </div>
+                  <span className="font-bold text-sm text-cyan-500">
+                    {editorBlocks.length > 0 
+                      ? (Math.sqrt(calculateTotalTSS(editorBlocks, calculateBlockDuration) * 3600 / (getTotalDuration() * 60 * 100))).toFixed(2)
+                      : "0.00"}
+                  </span>
+                </div>
+              </div>
+              
+              <div className="flex items-center justify-between">
+                <Label className="text-xs font-medium">Grafico Struttura</Label>
+              </div>
+              
+              {/* Visual Block Chart */}
+              <div className="h-16 flex gap-0.5 rounded overflow-hidden bg-muted/30">
+                {editorBlocks.length > 0 ? (
+                  editorBlocks.map((block, idx) => {
+                    const bt = BLOCK_TYPES.find(b => b.id === block.type)
+                    const duration = calculateBlockDuration(block)
+                    const totalDur = getTotalDuration() || 1
+                    const widthPercent = (duration / totalDur) * 100
+                    const zoneHeights: Record<string, string> = {
+                      Z1: "h-4", Z2: "h-6", Z3: "h-8", Z4: "h-10", Z5: "h-12", Z6: "h-14", Z7: "h-16"
+                    }
+                    
+                    return (
+                      <div
+                        key={block.id}
+                        className="flex items-end justify-center group relative cursor-pointer"
+                        style={{ width: `${Math.max(widthPercent, 3)}%`, minWidth: '12px' }}
+                        onClick={() => {
+                          // Could open edit for this block
+                        }}
+                      >
+                        <div 
+                          className={cn(
+                            "w-full rounded-t transition-all flex items-center justify-center",
+                            zoneHeights[block.zone] || "h-6",
+                            bt?.color || ZONE_COLORS[block.zone] || "bg-green-500"
+                          )}
+                        >
+                          <span className="text-[9px] text-white font-bold drop-shadow">{block.zone}</span>
+                        </div>
+                        {/* Tooltip on hover */}
+                        <div className="absolute bottom-full mb-1 hidden group-hover:block bg-popover text-popover-foreground text-[10px] p-1.5 rounded shadow-lg whitespace-nowrap z-20 border">
+                          <p className="font-medium">{bt?.name || block.type}</p>
+                          <p>{duration} min @ {block.zone}</p>
+                        </div>
+                      </div>
+                    )
+                  })
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-muted-foreground text-xs">
+                    Aggiungi blocchi per vedere l'anteprima
+                  </div>
+                )}
+              </div>
+              {editorBlocks.length > 0 && (
+                <div className="flex justify-between text-[10px] text-muted-foreground">
+                  <span>0 min</span>
+                  <span>{getTotalDuration()} min</span>
+                </div>
+              )}
             </div>
 
             {/* Block Type Buttons */}
@@ -942,7 +1237,7 @@ function VyriaTrainingPlan({ athleteData, userName, onUpdate }: VyriaTrainingPla
               <Label className="text-xs mb-2 block">Aggiungi Blocco</Label>
               <div className="flex flex-wrap gap-2">
                 {BLOCK_TYPES.map((bt) => (
-                  <Button key={bt.id} variant="outline" size="sm" onClick={() => addBlock(bt)} className="h-8">
+                  <Button key={bt.id} variant="outline" size="sm" onClick={() => addBlock(bt)} className="h-8 bg-transparent">
                     <div className={`w-3 h-3 rounded-full ${bt.color} mr-2`} />
                     {bt.name}
                   </Button>
@@ -1144,12 +1439,14 @@ function VyriaTrainingPlan({ athleteData, userName, onUpdate }: VyriaTrainingPla
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        {/* Rimuovo tab Settimana, VYRIA diventa: Zone, Palestra, Biblioteca, Piano Annuale, Impostazioni */}
-        {/* Cambio da 6 a 5 colonne e rimuovo TabsTrigger "weekly" */}
-        <TabsList className="grid w-full grid-cols-5">
+        <TabsList className="grid w-full grid-cols-6">
           <TabsTrigger value="zones" className="flex items-center gap-1">
             <Heart className="h-4 w-4" />
             <span className="hidden sm:inline">Zone</span>
+          </TabsTrigger>
+          <TabsTrigger value="builder" className="flex items-center gap-1">
+            <Zap className="h-4 w-4" />
+            <span className="hidden sm:inline">Builder</span>
           </TabsTrigger>
           <TabsTrigger value="gym" className="flex items-center gap-1">
             <Dumbbell className="h-4 w-4" />
@@ -1286,6 +1583,160 @@ function VyriaTrainingPlan({ athleteData, userName, onUpdate }: VyriaTrainingPla
             </div>
           </div>
         </TabsContent>
+        
+        {/* TAB: BUILDER - Crea allenamenti singoli */}
+        <TabsContent value="builder" className="space-y-6 mt-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Zap className="h-5 w-5 text-fuchsia-500" />
+                Workout Builder
+              </CardTitle>
+              <CardDescription>
+                Crea allenamenti personalizzati multisport e salvali nel calendario
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+{/* Date Selector */}
+  <div className="mb-6 space-y-3">
+  <Label className="text-sm font-medium">Seleziona Data</Label>
+  <div className="flex items-center gap-4 flex-wrap">
+    <div className="flex items-center gap-2">
+      <CalendarRange className="h-4 w-4 text-muted-foreground" />
+      <input
+        type="date"
+        value={selectedDate.toISOString().split('T')[0]}
+        onChange={(e) => {
+          const newDate = new Date(e.target.value)
+          setSelectedDate(newDate)
+          const dayOfWeek = newDate.getDay()
+          setSelectedDay(dayOfWeek === 0 ? 6 : dayOfWeek - 1)
+        }}
+        className="bg-background border border-border rounded px-3 py-2 text-sm"
+      />
+    </div>
+    <Badge variant="outline" className="text-sm py-1.5 px-3">
+      {DAY_NAMES[selectedDay]} {selectedDate.toLocaleDateString('it-IT', { day: 'numeric', month: 'long', year: 'numeric' })}
+    </Badge>
+  </div>
+  {/* Quick day buttons */}
+  <div className="flex gap-2 flex-wrap">
+  {DAY_NAMES.map((day, idx) => {
+    // Calculate the actual date for this day of the current week
+    const today = new Date()
+    const currentDayOfWeek = today.getDay() === 0 ? 6 : today.getDay() - 1
+    const diff = idx - currentDayOfWeek
+    const targetDate = new Date(today)
+    targetDate.setDate(today.getDate() + diff)
+    
+    return (
+      <Button
+        key={day}
+        variant={selectedDay === idx ? "default" : "outline"}
+        size="sm"
+        onClick={() => {
+          setSelectedDay(idx)
+          setSelectedDate(targetDate)
+        }}
+        className={selectedDay === idx ? "bg-fuchsia-600 hover:bg-fuchsia-700" : "bg-transparent"}
+      >
+        {day.slice(0, 3)}
+      </Button>
+    )
+  })}
+  </div>
+  </div>
+              
+              {/* Show inline editor or button to create */}
+              {showInlineEditor ? (
+                renderInlineEditor()
+              ) : (
+                <div className="text-center py-8 border-2 border-dashed border-border rounded-lg">
+                  <Zap className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                  <h3 className="text-lg font-semibold mb-2">Crea Nuovo Allenamento</h3>
+                  <p className="text-muted-foreground mb-4">
+                    Seleziona il giorno e crea un allenamento personalizzato per {DAY_NAMES[selectedDay]}
+                  </p>
+                  <Button 
+                    onClick={() => setShowInlineEditor(true)}
+                    className="bg-fuchsia-600 hover:bg-fuchsia-700"
+                  >
+                    <Zap className="h-4 w-4 mr-2" />
+                    Crea Allenamento
+                  </Button>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+          
+          {/* Show created workouts for this week */}
+          {generatedPlan.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Activity className="h-5 w-5 text-fuchsia-500" />
+                  Allenamenti Creati ({generatedPlan.length})
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  {generatedPlan.map((session) => {
+                    const sportInfo = SPORTS.find(s => s.id === session.sport)
+                    const SportIcon = sportInfo?.icon || Activity
+                    return (
+                      <div key={session.sessionId} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+                        <div className="flex items-center gap-3">
+                          <div className={`p-2 rounded-lg ${ZONE_COLORS[session.targetZone] || 'bg-blue-500'}`}>
+                            <SportIcon className="h-4 w-4 text-white" />
+                          </div>
+                          <div>
+                            <p className="font-medium">{session.title}</p>
+                            <p className="text-sm text-muted-foreground">
+                              {DAY_NAMES[session.dayIndex]} - {session.duration}min - {session.targetZone}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Badge variant="outline">{session.tss || 0} TSS</Badge>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => {
+                              setSessionToDelete(session.sessionId)
+                              setDeleteDialogOpen(true)
+                            }}
+                          >
+                            <Trash2 className="h-4 w-4 text-red-500" />
+                          </Button>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+                
+                {/* Save to Calendar button */}
+                <Button 
+                  className="w-full mt-4 bg-fuchsia-600 hover:bg-fuchsia-700"
+                  onClick={saveWeekToTraining}
+                  disabled={saving || generatedPlan.length === 0}
+                >
+                  {saving ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Salvataggio...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="h-4 w-4 mr-2" />
+                      Salva nel Calendario
+                    </>
+                  )}
+                </Button>
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+        
         {/* TAB: PALESTRA */}
         <TabsContent value="gym" className="space-y-6 mt-6">
           <GymExerciseLibrary
@@ -1342,14 +1793,17 @@ function VyriaTrainingPlan({ athleteData, userName, onUpdate }: VyriaTrainingPla
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {SPORTS.map((sport) => (
-                      <SelectItem key={sport.id} value={sport.id}>
-                        <div className="flex items-center gap-2">
-                          <sport.icon className="h-4 w-4" />
-                          {sport.name}
-                        </div>
-                      </SelectItem>
-                    ))}
+                    {SPORTS.map((sport) => {
+                      const SportIcon = sport.icon
+                      return (
+                        <SelectItem key={sport.id} value={sport.id}>
+                          <div className="flex items-center gap-2">
+                            <SportIcon className="h-4 w-4" />
+                            {sport.name}
+                          </div>
+                        </SelectItem>
+                      )
+                    })}
                   </SelectContent>
                 </Select>
               </div>
