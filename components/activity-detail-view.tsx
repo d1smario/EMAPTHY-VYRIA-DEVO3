@@ -285,12 +285,12 @@ export function ActivityDetailView({ activity, onClose, athleteFTP = 250 }: Acti
                     {activeMetrics.elevation && <YAxis yAxisId="elev" orientation="right" tick={{ fill: '#6b7280', fontSize: 9 }} axisLine={false} tickLine={false} domain={['dataMin - 50', 'dataMax + 50']} />}
                     <YAxis yAxisId="main" tick={{ fill: '#6b7280', fontSize: 9 }} axisLine={false} tickLine={false} domain={[0, 'auto']} />
                     <Tooltip content={<CustomTooltip />} />
-                    {activeMetrics.elevation && <Area yAxisId="elev" type="monotone" dataKey="elevation" fill="url(#elevGrad)" stroke="#6b7280" strokeWidth={0.5} />}
-                    {activeMetrics.power && <Line yAxisId="main" type="monotone" dataKey="power" stroke="#eab308" strokeWidth={1} dot={false} />}
-                    {activeMetrics.hr && <Line yAxisId="main" type="monotone" dataKey="hr" stroke="#ef4444" strokeWidth={1} dot={false} />}
-                    {activeMetrics.cadence && <Line yAxisId="main" type="monotone" dataKey="cadence" stroke="#a855f7" strokeWidth={1} dot={false} />}
-                    {activeMetrics.speed && <Line yAxisId="main" type="monotone" dataKey="speed" stroke="#22c55e" strokeWidth={1} dot={false} />}
-                    {activeMetrics.temperature && <Line yAxisId="main" type="monotone" dataKey="temperature" stroke="#06b6d4" strokeWidth={1} dot={false} />}
+                    {activeMetrics.elevation && <Area yAxisId="elev" type="monotone" dataKey="elevation" fill="url(#elevGrad)" stroke="#9ca3af" strokeWidth={2} />}
+                    {activeMetrics.power && <Line yAxisId="main" type="monotone" dataKey="power" stroke="#eab308" strokeWidth={0.5} dot={false} />}
+                    {activeMetrics.hr && <Line yAxisId="main" type="monotone" dataKey="hr" stroke="#ef4444" strokeWidth={0.5} dot={false} />}
+                    {activeMetrics.cadence && <Line yAxisId="main" type="monotone" dataKey="cadence" stroke="#a855f7" strokeWidth={0.5} dot={false} />}
+                    {activeMetrics.speed && <Line yAxisId="main" type="monotone" dataKey="speed" stroke="#22c55e" strokeWidth={0.5} dot={false} />}
+                    {activeMetrics.temperature && <Line yAxisId="main" type="monotone" dataKey="temperature" stroke="#06b6d4" strokeWidth={0.5} dot={false} />}
                   </ComposedChart>
                 </ResponsiveContainer>
               </CardContent>
