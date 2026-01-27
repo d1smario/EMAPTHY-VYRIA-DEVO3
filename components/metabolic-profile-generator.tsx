@@ -797,3 +797,4 @@ export function MetabolicProfileGenerator({
     </div>
   )
 }
+
