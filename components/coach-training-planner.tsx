@@ -33,6 +33,7 @@ import {
   Upload,
   Save,
   Settings,
+  Pencil,
 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 
@@ -905,7 +906,7 @@ export function CoachTrainingPlanner({ coachId, linkedAthletes }: CoachTrainingP
           intervalDuration: Math.round(hardSec / 6) / 10, // convert to min with 1 decimal
           numIntervals: numRepeats,
           primaryZone: hardZone,
-          secondaryZone: easyZone, // This was the undeclared variable fix
+          secondaryZone: easyZone,
           restBetweenIntervals: easySec,
           description: `${numRepeats}x ${hardSec}sec ${hardZone.toUpperCase()}`,
         })
@@ -1632,18 +1633,63 @@ export function CoachTrainingPlanner({ coachId, linkedAthletes }: CoachTrainingP
           return (
             <Card
               key={index}
-              className={`bg-slate-800/50 border-slate-700 cursor-pointer transition-all hover:border-blue-500 ${
+              className={`bg-slate-800/50 border-slate-700 transition-all hover:border-blue-500 ${
                 selectedDay === index ? "border-blue-500 ring-1 ring-blue-500" : ""
               } ${isRestDay ? "opacity-60" : ""}`}
-              onClick={() => {
-                setSelectedDay(index)
-                setBuilderOpen(true)
-              }}
             >
-              <CardHeader className="p-3 pb-1">
-                <CardTitle className="text-sm text-white">{session.dayName.slice(0, 3)}</CardTitle>
+              <CardHeader className="p-2 pb-1">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-sm text-white">{session.dayName.slice(0, 3)}</CardTitle>
+                  {hasWorkout && (
+                    <div className="flex gap-1">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6 text-blue-400 hover:text-blue-300 hover:bg-blue-900/30"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setSelectedDay(index)
+                          setBuilderOpen(true)
+                        }}
+                        title="Modifica"
+                      >
+                        <Pencil className="h-3 w-3" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6 text-red-400 hover:text-red-300 hover:bg-red-900/30"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          if (confirm("Cancellare questo allenamento?")) {
+                            setWeeklyPlan((prev) => {
+                              const newPlan = [...prev]
+                              newPlan[index] = {
+                                ...newPlan[index],
+                                advancedBlocks: [],
+                                gymExercises: [],
+                                description: "",
+                                duration: 0,
+                              }
+                              return newPlan
+                            })
+                          }
+                        }}
+                        title="Cancella"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  )}
+                </div>
               </CardHeader>
-              <CardContent className="p-3 pt-0">
+              <CardContent
+                className="p-2 pt-0 cursor-pointer"
+                onClick={() => {
+                  setSelectedDay(index)
+                  setBuilderOpen(true)
+                }}
+              >
                 {isRestDay ? (
                   <div className="h-12 flex items-center justify-center">
                     <span className="text-xs text-slate-500">Riposo</span>
@@ -1670,7 +1716,6 @@ export function CoachTrainingPlanner({ coachId, linkedAthletes }: CoachTrainingP
                         {session.gymExercises.length}
                       </div>
                     )}
-                    <div className="text-xs text-blue-400 mt-1">Clicca per modificare</div>
                   </div>
                 ) : (
                   <div className="h-12 flex items-center justify-center">
