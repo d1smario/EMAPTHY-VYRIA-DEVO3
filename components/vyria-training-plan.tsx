@@ -246,7 +246,7 @@ const ZONES = ["Z1", "Z2", "Z3", "Z4", "Z5", "Z6", "Z7"]
 
 // ═══════════════════════════════════════════════════════════════════════════
 // HELPER FUNCTIONS
-// ═══════════════════════════════════════════════════════════════════════════
+// ═════════════════════════���═════════════════════════════════════════════════
 
 const generateId = () => Math.random().toString(36).substring(2, 9)
 
@@ -286,7 +286,12 @@ function VyriaTrainingPlan({ athleteData, userName, onUpdate }: VyriaTrainingPla
 
   // Weekly Plan State
   const [generatedPlan, setGeneratedPlan] = useState<TrainingSession[]>([])
-  const [selectedDay, setSelectedDay] = useState(0)
+  // Initialize selectedDay based on current day of week (0=Mon, 1=Tue, ..., 6=Sun)
+  const [selectedDay, setSelectedDay] = useState(() => {
+    const today = new Date()
+    const dayOfWeek = today.getDay() // 0=Sun, 1=Mon, 2=Tue, 3=Wed, ...
+    return dayOfWeek === 0 ? 6 : dayOfWeek - 1 // Convert to 0=Mon, ..., 6=Sun
+  })
   const [selectedDate, setSelectedDate] = useState<Date>(new Date())
 
   // Dialog State
@@ -627,12 +632,13 @@ return {
   duration_minutes: session.duration,
   target_zone: session.targetZone,
   tss: session.tss || Math.round(session.duration * 0.8),
-  average_power: session.avgPower,
-  calories: session.kcal,
-  intervals: { blocks: session.blocks },
-  gym_exercises: session.gymExercises,
+  average_power: session.avgPower || null,
+  calories: session.kcal || null,
+  intervals: session.gymExercises 
+    ? { blocks: session.blocks, gymExercises: session.gymExercises }
+    : { blocks: session.blocks },
   planned: true,
-  completed: session.completed,
+  completed: session.completed || false,
   source: "vyria_generated",
   }
       })
