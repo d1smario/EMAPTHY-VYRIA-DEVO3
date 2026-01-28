@@ -266,7 +266,7 @@ const getWeekDateRange = () => {
 
 // ═══════════════════════════════════════════════════════════════════════════
 // MAIN COMPONENT
-// ════════════��══════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════════
 
 function VyriaTrainingPlan({ athleteData, userName, onUpdate }: VyriaTrainingPlanProps) {
   const supabase = createClient()
