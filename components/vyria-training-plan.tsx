@@ -1977,3 +1977,4 @@ return (
 }
 
 export default VyriaTrainingPlan
+
