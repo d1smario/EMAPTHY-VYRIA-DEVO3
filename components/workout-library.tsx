@@ -1,7 +1,7 @@
 "use client"
 
 import { cn } from "@/lib/utils"
-import { Clock, Zap } from "lucide-react"
+import { Clock, Zap, CheckCircle2, CalendarPlus } from "lucide-react"
 
 import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -308,8 +308,15 @@ export function WorkoutLibrary({
 
   // Insert workout into calendar (training_activities)
   const insertIntoTraining = async () => {
-    if (!selectedWorkoutToInsert || !athleteId) {
-      alert("Seleziona un allenamento e assicurati che l'atleta sia configurato")
+    console.log("[v0] insertIntoTraining - athleteId:", athleteId, "workout:", selectedWorkoutToInsert?.name)
+    
+    if (!selectedWorkoutToInsert) {
+      alert("Seleziona un allenamento")
+      return
+    }
+    
+    if (!athleteId) {
+      alert("Nessun atleta selezionato. Assicurati di essere nella dashboard di un atleta.")
       return
     }
 
@@ -568,7 +575,16 @@ export function WorkoutLibrary({
                   const SportIcon = getSportIcon(workout.sport)
 
                   return (
-                    <Card key={workout.id} className="hover:shadow-md transition-shadow bg-zinc-900/80 border-zinc-700">
+                    <Card 
+                      key={workout.id} 
+                      className={cn(
+                        "hover:shadow-md transition-all cursor-pointer bg-zinc-900/80",
+                        selectedWorkoutToInsert?.id === workout.id 
+                          ? "border-2 border-fuchsia-500 ring-2 ring-fuchsia-500/30" 
+                          : "border-zinc-700 hover:border-zinc-500"
+                      )}
+                      onClick={() => setSelectedWorkoutToInsert(workout)}
+                    >
                       <CardHeader className="pb-2">
                         <CardTitle className="flex items-center justify-between text-base">
                           <div className="flex items-center gap-2">
@@ -662,24 +678,27 @@ export function WorkoutLibrary({
                           </div>
                         )}
                         <div className="flex gap-2 pt-2">
-                          <Button size="sm" variant="outline" onClick={() => openEditDialog(workout)}>
+                          <Button 
+                            size="sm" 
+                            variant="outline" 
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              openEditDialog(workout)
+                            }}
+                          >
                             <Pencil className="h-3 w-3 mr-1" />
                             Modifica
                           </Button>
-                          <Button size="sm" variant="destructive" onClick={() => deleteWorkout(workout.id)}>
-                            <Trash2 className="h-3 w-3 mr-1" />
-                            Elimina
-                          </Button>
-                          <Button
-                            size="sm"
-                            className="ml-auto"
-                            onClick={() => {
-                              setSelectedWorkoutToInsert(workout)
-                              setShowInsertDialog(true)
+                          <Button 
+                            size="sm" 
+                            variant="destructive" 
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              deleteWorkout(workout.id)
                             }}
                           >
-                            <Plus className="h-3 w-3 mr-1" />
-                            Usa in Calendario
+                            <Trash2 className="h-3 w-3 mr-1" />
+                            Elimina
                           </Button>
                         </div>
                       </CardContent>
@@ -690,6 +709,35 @@ export function WorkoutLibrary({
             </TabsContent>
           ))}
         </Tabs>
+      )}
+      
+      {/* Selected Workout Action Bar */}
+      {selectedWorkoutToInsert && (
+        <div className="sticky bottom-0 p-4 bg-zinc-800 border-t border-zinc-700 rounded-b-lg flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-fuchsia-500/20">
+              <CheckCircle2 className="h-5 w-5 text-fuchsia-500" />
+            </div>
+            <div>
+              <p className="font-medium">{selectedWorkoutToInsert.name}</p>
+              <p className="text-sm text-muted-foreground">
+                {selectedWorkoutToInsert.duration_minutes} min - {selectedWorkoutToInsert.tss_estimate} TSS - {selectedWorkoutToInsert.sport}
+              </p>
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => setSelectedWorkoutToInsert(null)}>
+              Annulla
+            </Button>
+            <Button 
+              className="bg-fuchsia-500 hover:bg-fuchsia-600"
+              onClick={() => setShowInsertDialog(true)}
+            >
+              <CalendarPlus className="h-4 w-4 mr-2" />
+              Inserisci in Calendario
+            </Button>
+          </div>
+        </div>
       )}
 
       {/* Create/Edit Dialog */}
@@ -1090,25 +1138,44 @@ export function WorkoutLibrary({
             <DialogTitle>Inserisci in Calendario</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
-            <div className="p-3 bg-muted rounded-md">
+            <div className="p-3 bg-zinc-800 rounded-md">
               <p className="font-medium">{selectedWorkoutToInsert?.name}</p>
               <p className="text-sm text-muted-foreground">
-                {selectedWorkoutToInsert?.duration_minutes} min • {selectedWorkoutToInsert?.tss_estimate} TSS
+                {selectedWorkoutToInsert?.duration_minutes} min • {selectedWorkoutToInsert?.tss_estimate} TSS • {selectedWorkoutToInsert?.sport}
               </p>
             </div>
+            
+            {!athleteId && (
+              <div className="p-3 bg-red-500/20 border border-red-500/50 rounded-md">
+                <p className="text-sm text-red-400">Attenzione: Nessun atleta selezionato. L'allenamento non potrà essere salvato.</p>
+              </div>
+            )}
+            
             <div>
-              <Label>Seleziona giorno</Label>
-              <div className="grid grid-cols-2 gap-2 mt-2">
-                {DAY_NAMES.map((dayName, index) => (
-                  <Button
-                    key={index}
-                    variant={selectedDayIndex === index ? "default" : "outline"}
-                    className="w-full"
-                    onClick={() => setSelectedDayIndex(index)}
-                  >
-                    {dayName}
-                  </Button>
-                ))}
+              <Label>Seleziona giorno della settimana corrente</Label>
+              <div className="grid grid-cols-4 gap-2 mt-2">
+                {DAY_NAMES.map((dayName, index) => {
+                  // Calculate actual date for this day
+                  const today = new Date()
+                  const dayOfWeek = today.getDay()
+                  const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek
+                  const monday = new Date(today)
+                  monday.setDate(today.getDate() + mondayOffset)
+                  const dayDate = new Date(monday)
+                  dayDate.setDate(monday.getDate() + index)
+                  
+                  return (
+                    <Button
+                      key={index}
+                      variant={selectedDayIndex === index ? "default" : "outline"}
+                      className="w-full flex flex-col py-2 h-auto"
+                      onClick={() => setSelectedDayIndex(index)}
+                    >
+                      <span className="text-xs">{dayName.slice(0, 3)}</span>
+                      <span className="text-lg font-bold">{dayDate.getDate()}</span>
+                    </Button>
+                  )
+                })}
               </div>
             </div>
           </div>
@@ -1116,7 +1183,9 @@ export function WorkoutLibrary({
             <Button variant="outline" onClick={() => setShowInsertDialog(false)}>
               Annulla
             </Button>
-            <Button onClick={insertIntoTraining}>Inserisci</Button>
+            <Button onClick={insertIntoTraining} disabled={!athleteId}>
+              Inserisci nel Calendario
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
