@@ -44,6 +44,7 @@ import {
   Clock,
   Flame,
   TrendingUp,
+  Pencil,
 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { AnnualPlanGenerator } from "./annual-plan-generator"
@@ -246,7 +247,7 @@ const ZONES = ["Z1", "Z2", "Z3", "Z4", "Z5", "Z6", "Z7"]
 
 // ═══════════════════════════════════════════════════════════════════════════
 // HELPER FUNCTIONS
-// ═════════════════════════���═════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════════
 
 const generateId = () => Math.random().toString(36).substring(2, 9)
 
@@ -605,11 +606,15 @@ function VyriaTrainingPlan({ athleteData, userName, onUpdate }: VyriaTrainingPla
   }
 
 const saveWeekToTraining = async () => {
-  if (!athleteData?.id || generatedPlan.length === 0) return
+  if (!athleteData?.id || generatedPlan.length === 0) {
+    console.log("[v0] saveWeekToTraining: no athlete or no plan", athleteData?.id, generatedPlan.length)
+    return
+  }
   
   setSaving(true)
   try {
   const { monday } = getWeekDateRange()
+  console.log("[v0] saveWeekToTraining: monday =", monday, "plan count =", generatedPlan.length)
   
   const workoutsToInsert = generatedPlan.map((session) => {
         // Use activityDate if available, otherwise calculate from dayIndex
@@ -642,13 +647,23 @@ return {
   source: "vyria_generated",
   }
       })
-      const { error } = await supabase.from("training_activities").insert(workoutsToInsert)
-      if (error) throw error
+      
+      console.log("[v0] Inserting workouts:", workoutsToInsert)
+      const { data, error } = await supabase.from("training_activities").insert(workoutsToInsert).select()
+      
+      if (error) {
+        console.error("[v0] saveWeekToTraining error:", error.message, error.details, error.hint)
+        alert(`Errore: ${error.message}`)
+        throw error
+      }
+      
+      console.log("[v0] Workouts saved:", data)
       alert("Piano settimanale salvato!")
+      setGeneratedPlan([]) // Clear the list after saving
       onUpdate?.()
-    } catch (err) {
-      console.error("Error saving week:", err)
-      alert("Errore nel salvataggio")
+    } catch (err: any) {
+      console.error("[v0] Error saving week:", err)
+      alert(`Errore nel salvataggio: ${err?.message || err}`)
     } finally {
       setSaving(false)
     }
@@ -869,13 +884,17 @@ const saveEditorWorkout = async () => {
     }
     
     console.log("[v0] Saving workout to DB:", workoutData)
+    console.log("[v0] Athlete ID:", athleteData.id, "User ID:", athleteData.user_id)
     
-    const { error } = await supabase.from("training_activities").insert(workoutData)
+    const { data: insertedData, error } = await supabase.from("training_activities").insert(workoutData).select()
     
     if (error) {
-      console.error("[v0] Error saving workout:", error)
+      console.error("[v0] Error saving workout:", error.message, error.details, error.hint)
+      alert(`Errore salvataggio: ${error.message}`)
       throw error
     }
+    
+    console.log("[v0] Workout saved successfully:", insertedData)
     
     // Also add to local state for immediate UI update
     const newSession: TrainingSession = {
@@ -1027,14 +1046,14 @@ const saveEditorWorkout = async () => {
   const renderInlineEditor = () => {
     const blockType = (type: string) => BLOCK_TYPES.find((b) => b.id === type)
 
-    return (
-      <Card className="border-fuchsia-500/50 bg-fuchsia-500/5">
-        <CardHeader className="pb-3">
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-lg flex items-center gap-2">
-              <Zap className="h-5 w-5 text-fuchsia-500" />
-              Crea Allenamento
-            </CardTitle>
+return (
+  <Card id="workout-editor" className="border-fuchsia-500/50 bg-fuchsia-500/5">
+  <CardHeader className="pb-3">
+  <div className="flex items-center justify-between">
+  <CardTitle className="text-lg flex items-center gap-2">
+  <Zap className="h-5 w-5 text-fuchsia-500" />
+  Crea Allenamento
+  </CardTitle>
             <Button variant="ghost" size="icon" onClick={resetEditor}>
               <X className="h-4 w-4" />
             </Button>
@@ -1429,7 +1448,7 @@ const saveEditorWorkout = async () => {
     )
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ══════════════════════════════════════════════════════���════════════════════
   // MAIN RENDER
   // ═══════════════════════════════════════════════════════════════════════════
 
@@ -1717,6 +1736,26 @@ const saveEditorWorkout = async () => {
                         </div>
                         <div className="flex items-center gap-2">
                           <Badge variant="outline">{session.tss || 0} TSS</Badge>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setSelectedDay(session.dayIndex)
+                              setEditorSport(session.sport)
+                              setEditorTitle(session.title)
+                              setEditorNotes(session.description)
+                              setEditorBlocks(session.blocks || [])
+                              setShowInlineEditor(true)
+                              // Scroll to editor
+                              setTimeout(() => {
+                                document.getElementById('workout-editor')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+                              }, 100)
+                            }}
+                          >
+                            <Pencil className="h-3 w-3 mr-1" />
+                            Modifica
+                          </Button>
                           <Button
                             variant="ghost"
                             size="icon"
