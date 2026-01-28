@@ -1208,3 +1208,4 @@ export function ActivitiesHub({ athleteData, userName }: ActivitiesHubProps) {
 }
 
 export default ActivitiesHub
+
